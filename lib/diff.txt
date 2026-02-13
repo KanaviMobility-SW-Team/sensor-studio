@@ -1,0 +1,1124 @@
+diff --git a/lib/app.dart b/lib/app.dart
+new file mode 100644
+index 0000000..df47954
+--- /dev/null
++++ b/lib/app.dart
+@@ -0,0 +1,34 @@
++// app.dart
++import 'package:flutter/material.dart';
++import 'core/theme/app_theme.dart';
++import 'shared/widgets/app_scaffold.dart';
++import 'shared/widgets/app_toolbar.dart';
++import 'features/sensor/widgets/sensor_list_panel.dart';
++import 'features/viewer/pointcloud_viewer.dart';
++
++class SensorStudioApp extends StatelessWidget {
++  const SensorStudioApp({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return MaterialApp(
++      title: 'Sensor Studio',
++      theme: AppTheme.dark(),
++      home: const MainScreen(),
++      debugShowCheckedModeBanner: false,
++    );
++  }
++}
++
++class MainScreen extends StatelessWidget {
++  const MainScreen({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return AppScaffold(
++      toolbar: const AppToolbar(),
++      left: const SensorListPanel(),
++      center: const PointCloudViewer(),
++    );
++  }
++}
+diff --git a/lib/core/theme/app_theme.dart b/lib/core/theme/app_theme.dart
+new file mode 100644
+index 0000000..2122b50
+--- /dev/null
++++ b/lib/core/theme/app_theme.dart
+@@ -0,0 +1,34 @@
++import 'package:flutter/material.dart';
++
++class AppTheme {
++  static ThemeData dark() {
++    const background = Color(0xFF0E141B);
++    const surface = Color(0xFF161E27);
++    const textPrimary = Color(0xFFE5E7EB);
++
++    final colorScheme = ColorScheme.fromSeed(
++      seedColor: const Color(0xFF2DD4BF), // accent (cyan/teal)
++      brightness: Brightness.dark,
++      background: background,
++      surface: surface,
++    );
++
++    return ThemeData(
++      useMaterial3: true,
++      colorScheme: colorScheme,
++      scaffoldBackgroundColor: background,
++      appBarTheme: const AppBarTheme(
++        backgroundColor: background,
++        foregroundColor: textPrimary,
++        elevation: 0,
++      ),
++      dividerTheme: const DividerThemeData(
++        thickness: 1,
++      ),
++      listTileTheme: const ListTileThemeData(
++        iconColor: textPrimary,
++        textColor: textPrimary,
++      ),
++    );
++  }
++}
+\ No newline at end of file
+diff --git a/lib/features/sensor/sensor_providers.dart b/lib/features/sensor/sensor_providers.dart
+new file mode 100644
+index 0000000..40d7234
+--- /dev/null
++++ b/lib/features/sensor/sensor_providers.dart
+@@ -0,0 +1,17 @@
++// features/sensor/sensor_providers.dart
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../../shared/models/sensor.dart';
++
++final sensorsProvider = Provider<List<Sensor>>((ref) {
++  // TODO: 나중에 서버에서 받는 걸로 교체
++  return const [
++    Sensor(id: 'lidar-01', name: 'LiDAR-01', type: 'lidar'),
++    Sensor(id: 'lidar-02', name: 'LiDAR-02', type: 'lidar'),
++    Sensor(id: 'cam-01', name: 'CAM-01', type: 'camera'),
++  ];
++});
++
++final selectedSensorIdProvider = StateProvider<String?>((ref) {
++  // 기본 선택
++  return 'lidar-01';
++});
+diff --git a/lib/features/sensor/widgets/sensor_list_item.dart b/lib/features/sensor/widgets/sensor_list_item.dart
+new file mode 100644
+index 0000000..5e832dd
+--- /dev/null
++++ b/lib/features/sensor/widgets/sensor_list_item.dart
+@@ -0,0 +1,26 @@
++// features/sensor/widgets/sensor_list_item.dart
++import 'package:flutter/material.dart';
++import '../../../shared/models/sensor.dart';
++
++class SensorListItem extends StatelessWidget {
++  final Sensor sensor;
++  final bool selected;
++  final VoidCallback onTap;
++
++  const SensorListItem({
++    super.key,
++    required this.sensor,
++    required this.selected,
++    required this.onTap,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    return ListTile(
++      selected: selected,
++      title: Text(sensor.name),
++      subtitle: Text(sensor.type),
++      onTap: onTap,
++    );
++  }
++}
+\ No newline at end of file
+diff --git a/lib/features/sensor/widgets/sensor_list_panel.dart b/lib/features/sensor/widgets/sensor_list_panel.dart
+new file mode 100644
+index 0000000..93d2e8f
+--- /dev/null
++++ b/lib/features/sensor/widgets/sensor_list_panel.dart
+@@ -0,0 +1,30 @@
++// features/sensor/widgets/sensor_list_panel.dart
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../sensor_providers.dart';
++import 'sensor_list_item.dart';
++
++class SensorListPanel extends ConsumerWidget {
++  const SensorListPanel({super.key});
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final sensors = ref.watch(sensorsProvider);
++    final selectedId = ref.watch(selectedSensorIdProvider);
++
++    return ListView(
++      children: [
++        const Padding(
++          padding: EdgeInsets.all(12),
++          child: Text('Sensors', style: TextStyle(fontSize: 14)),
++        ),
++        for (final s in sensors)
++          SensorListItem(
++            sensor: s,
++            selected: selectedId == s.id,
++            onTap: () => ref.read(selectedSensorIdProvider.notifier).state = s.id,
++          ),
++      ],
++    );
++  }
++}
+\ No newline at end of file
+diff --git a/lib/features/streaming/streaming_controller.dart b/lib/features/streaming/streaming_controller.dart
+new file mode 100644
+index 0000000..aff480b
+--- /dev/null
++++ b/lib/features/streaming/streaming_controller.dart
+@@ -0,0 +1,67 @@
++// features/streaming/streaming_controller.dart
++import 'dart:async';
++import '../../shared/models/frame.dart';
++import 'ws_client.dart';
++import 'ws_protocol.dart';
++
++enum ConnectionStateX { disconnected, connecting, connected, error }
++
++class StreamingController {
++  final WsClient _client;
++  StreamSubscription? _sub;
++
++  final _conn = StreamController<ConnectionStateX>.broadcast();
++  Stream<ConnectionStateX> get connState => _conn.stream;
++
++  final Map<String, StreamController<Frame>> _sensorStreams = {};
++
++  StreamingController(this._client);
++
++  Stream<Frame> streamForSensor(String sensorId) {
++    return _sensorStreams
++        .putIfAbsent(sensorId, () => StreamController<Frame>.broadcast())
++        .stream;
++  }
++
++  Future<void> connect(Uri uri) async {
++    _conn.add(ConnectionStateX.connecting);
++    try {
++      await _client.connect(uri);
++      _conn.add(ConnectionStateX.connected);
++
++      _sub?.cancel();
++      _sub = _client.incoming.listen((bytes) {
++        final frame = WsProtocol.decode(bytes);
++        final sid = frame.sensorId;
++        if (sid != null) {
++          _sensorStreams
++              .putIfAbsent(sid, () => StreamController<Frame>.broadcast())
++              .add(frame);
++        }
++      }, onError: (_) => _conn.add(ConnectionStateX.error));
++    } catch (_) {
++      _conn.add(ConnectionStateX.error);
++    }
++  }
++
++  void subscribe(String sensorId) {
++    _client.send(
++      WsProtocol.encodeJson({'cmd': 'subscribe', 'sensorId': sensorId}),
++    );
++  }
++
++  void unsubscribe(String sensorId) {
++    _client.send(
++      WsProtocol.encodeJson({'cmd': 'unsubscribe', 'sensorId': sensorId}),
++    );
++  }
++
++  Future<void> dispose() async {
++    await _sub?.cancel();
++    for (final c in _sensorStreams.values) {
++      await c.close();
++    }
++    await _conn.close();
++    await _client.close();
++  }
++}
+diff --git a/lib/features/streaming/streaming_providers.dart b/lib/features/streaming/streaming_providers.dart
+new file mode 100644
+index 0000000..cb0289f
+--- /dev/null
++++ b/lib/features/streaming/streaming_providers.dart
+@@ -0,0 +1,24 @@
++// features/streaming/streaming_providers.dart
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../../shared/models/frame.dart';
++import 'ws_client.dart';
++import 'streaming_controller.dart';
++
++final wsClientProvider = Provider((ref) => WsClient());
++
++final streamingControllerProvider = Provider((ref) {
++  final c = StreamingController(ref.watch(wsClientProvider));
++  ref.onDispose(() => c.dispose());
++  return c;
++});
++
++final connectionStateProvider = StreamProvider((ref) {
++  return ref.watch(streamingControllerProvider).connState;
++});
++
++final sensorFrameStreamProvider = StreamProvider.family<Frame, String>((
++  ref,
++  sensorId,
++) {
++  return ref.watch(streamingControllerProvider).streamForSensor(sensorId);
++});
+diff --git a/lib/features/streaming/ws_client.dart b/lib/features/streaming/ws_client.dart
+new file mode 100644
+index 0000000..76a5b48
+--- /dev/null
++++ b/lib/features/streaming/ws_client.dart
+@@ -0,0 +1,38 @@
++// features/streaming/ws_client.dart
++import 'dart:async';
++import 'dart:typed_data';
++import 'package:web_socket_channel/web_socket_channel.dart';
++import 'package:flutter_multiplatform_logger/flutter_multiplatform_logger.dart';
++
++class WsClient {
++  WebSocketChannel? _ch;
++  final _incoming = StreamController<Uint8List>.broadcast();
++  final _logger = Logger('WsClient');
++
++  Stream<Uint8List> get incoming => _incoming.stream;
++
++  Future<void> connect(Uri uri) async {
++    _ch = WebSocketChannel.connect(uri);
++    _ch!.stream.listen(
++      (data) {
++        _logger.info('WsClient received data: ${data}');
++        if (data is Uint8List) {
++          _incoming.add(data);
++        }
++
++        if (data is List<int>) {
++          _incoming.add(Uint8List.fromList(data));
++        }
++      },
++      onError: _incoming.addError,
++      cancelOnError: true,
++    );
++  }
++
++  void send(Uint8List bytes) {
++    _logger.info('WsClient sending data: ${bytes}');
++    _ch?.sink.add(bytes);
++  }
++
++  Future<void> close() async => _ch?.sink.close();
++}
+diff --git a/lib/features/streaming/ws_protocol.dart b/lib/features/streaming/ws_protocol.dart
+new file mode 100644
+index 0000000..c9a5f87
+--- /dev/null
++++ b/lib/features/streaming/ws_protocol.dart
+@@ -0,0 +1,24 @@
++// features/streaming/ws_protocol.dart
++import 'dart:convert';
++import 'dart:typed_data';
++import '../../shared/models/frame.dart';
++
++class WsProtocol {
++  // 예시: [type(1)][idLen(1)][idBytes][payload...]
++  static Frame decode(Uint8List bytes) {
++    final typeByte = bytes[0];
++    final idLen = bytes[1];
++    final sensorId = idLen > 0
++        ? utf8.decode(bytes.sublist(2, 2 + idLen))
++        : null;
++    final payload = Uint8List.fromList(bytes.sublist(2 + idLen));
++
++    final type =
++        FrameType.values[typeByte.clamp(0, FrameType.values.length - 1)];
++    return Frame(type: type, sensorId: sensorId, payload: payload);
++  }
++
++  static Uint8List encodeJson(Map<String, dynamic> cmd) {
++    return Uint8List.fromList(utf8.encode(jsonEncode(cmd)));
++  }
++}
+diff --git a/lib/features/viewer/pointcloud_providers.dart b/lib/features/viewer/pointcloud_providers.dart
+new file mode 100644
+index 0000000..e69de29
+diff --git a/lib/features/viewer/pointcloud_viewer.dart b/lib/features/viewer/pointcloud_viewer.dart
+new file mode 100644
+index 0000000..176e30d
+--- /dev/null
++++ b/lib/features/viewer/pointcloud_viewer.dart
+@@ -0,0 +1,62 @@
++// features/viewer/pointcloud_viewer.dart
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../sensor/sensor_providers.dart';
++import '../streaming/streaming_providers.dart';
++import '../streaming/streaming_controller.dart';
++
++class PointCloudViewer extends ConsumerStatefulWidget {
++  const PointCloudViewer({super.key});
++
++  @override
++  ConsumerState<PointCloudViewer> createState() => _PointCloudViewerState();
++}
++
++class _PointCloudViewerState extends ConsumerState<PointCloudViewer> {
++  String? _subscribedId;
++
++  @override
++  void initState() {
++    super.initState();
++    // connect once
++    Future.microtask(() async {
++      final controller = ref.read(streamingControllerProvider);
++      await controller.connect(Uri.parse('ws://localhost:18293'));
++    });
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final selectedId = ref.watch(selectedSensorIdProvider);
++
++    // selection 변경 시 subscribe 갱신
++    if (selectedId != null && selectedId != _subscribedId) {
++      final controller = ref.read(streamingControllerProvider);
++      if (_subscribedId != null) {
++        controller.unsubscribe(_subscribedId!);
++      }
++      
++      controller.subscribe(selectedId);
++      _subscribedId = selectedId;
++    }
++
++    if (selectedId == null) {
++      return const Center(child: Text('Select a sensor'));
++    }
++
++    final frameAsync = ref.watch(sensorFrameStreamProvider(selectedId));
++
++    return frameAsync.when(
++      data: (frame) {
++        // TODO: frame.payload -> point cloud parse & render
++        return Center(
++          child: Text(
++            'PointCloud frame from $selectedId (${frame.payload.length} bytes)',
++          ),
++        );
++      },
++      loading: () => const Center(child: Text('Waiting for data...')),
++      error: (e, _) => Center(child: Text('Stream error: $e')),
++    );
++  }
++}
+diff --git a/lib/main.dart b/lib/main.dart
+index 244a702..7f00a88 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,122 +1,11 @@
++// main.dart
+ import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_multiplatform_logger/flutter_multiplatform_logger.dart';
++import 'app.dart';
+ 
+-void main() {
+-  runApp(const MyApp());
+-}
+-
+-class MyApp extends StatelessWidget {
+-  const MyApp({super.key});
+-
+-  // This widget is the root of your application.
+-  @override
+-  Widget build(BuildContext context) {
+-    return MaterialApp(
+-      title: 'Flutter Demo',
+-      theme: ThemeData(
+-        // This is the theme of your application.
+-        //
+-        // TRY THIS: Try running your application with "flutter run". You'll see
+-        // the application has a purple toolbar. Then, without quitting the app,
+-        // try changing the seedColor in the colorScheme below to Colors.green
+-        // and then invoke "hot reload" (save your changes or press the "hot
+-        // reload" button in a Flutter-supported IDE, or press "r" if you used
+-        // the command line to start the app).
+-        //
+-        // Notice that the counter didn't reset back to zero; the application
+-        // state is not lost during the reload. To reset the state, use hot
+-        // restart instead.
+-        //
+-        // This works for code too, not just values: Most code changes can be
+-        // tested with just a hot reload.
+-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+-      ),
+-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+-    );
+-  }
+-}
+-
+-class MyHomePage extends StatefulWidget {
+-  const MyHomePage({super.key, required this.title});
+-
+-  // This widget is the home page of your application. It is stateful, meaning
+-  // that it has a State object (defined below) that contains fields that affect
+-  // how it looks.
+-
+-  // This class is the configuration for the state. It holds the values (in this
+-  // case the title) provided by the parent (in this case the App widget) and
+-  // used by the build method of the State. Fields in a Widget subclass are
+-  // always marked "final".
+-
+-  final String title;
+-
+-  @override
+-  State<MyHomePage> createState() => _MyHomePageState();
+-}
+-
+-class _MyHomePageState extends State<MyHomePage> {
+-  int _counter = 0;
+-
+-  void _incrementCounter() {
+-    setState(() {
+-      // This call to setState tells the Flutter framework that something has
+-      // changed in this State, which causes it to rerun the build method below
+-      // so that the display can reflect the updated values. If we changed
+-      // _counter without calling setState(), then the build method would not be
+-      // called again, and so nothing would appear to happen.
+-      _counter++;
+-    });
+-  }
++void main() async {
++  await FlutterMultiplatformLogger.init();
+ 
+-  @override
+-  Widget build(BuildContext context) {
+-    // This method is rerun every time setState is called, for instance as done
+-    // by the _incrementCounter method above.
+-    //
+-    // The Flutter framework has been optimized to make rerunning build methods
+-    // fast, so that you can just rebuild anything that needs updating rather
+-    // than having to individually change instances of widgets.
+-    return Scaffold(
+-      appBar: AppBar(
+-        // TRY THIS: Try changing the color here to a specific color (to
+-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
+-        // change color while the other colors stay the same.
+-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+-        // Here we take the value from the MyHomePage object that was created by
+-        // the App.build method, and use it to set our appbar title.
+-        title: Text(widget.title),
+-      ),
+-      body: Center(
+-        // Center is a layout widget. It takes a single child and positions it
+-        // in the middle of the parent.
+-        child: Column(
+-          // Column is also a layout widget. It takes a list of children and
+-          // arranges them vertically. By default, it sizes itself to fit its
+-          // children horizontally, and tries to be as tall as its parent.
+-          //
+-          // Column has various properties to control how it sizes itself and
+-          // how it positions its children. Here we use mainAxisAlignment to
+-          // center the children vertically; the main axis here is the vertical
+-          // axis because Columns are vertical (the cross axis would be
+-          // horizontal).
+-          //
+-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+-          // action in the IDE, or press "p" in the console), to see the
+-          // wireframe for each widget.
+-          mainAxisAlignment: .center,
+-          children: [
+-            const Text('You have pushed the button this many times:'),
+-            Text(
+-              '$_counter',
+-              style: Theme.of(context).textTheme.headlineMedium,
+-            ),
+-          ],
+-        ),
+-      ),
+-      floatingActionButton: FloatingActionButton(
+-        onPressed: _incrementCounter,
+-        tooltip: 'Increment',
+-        child: const Icon(Icons.add),
+-      ),
+-    );
+-  }
++  runApp(const ProviderScope(child: SensorStudioApp()));
+ }
+diff --git a/lib/shared/models/frame.dart b/lib/shared/models/frame.dart
+new file mode 100644
+index 0000000..51426e3
+--- /dev/null
++++ b/lib/shared/models/frame.dart
+@@ -0,0 +1,11 @@
++// shared/models/frame.dart
++import 'dart:typed_data';
++
++enum FrameType { pointCloud, sensorList, ack, error }
++
++class Frame {
++  final FrameType type;
++  final String? sensorId;
++  final Uint8List payload;
++  Frame({required this.type, required this.payload, this.sensorId});
++}
+\ No newline at end of file
+diff --git a/lib/shared/models/sensor.dart b/lib/shared/models/sensor.dart
+new file mode 100644
+index 0000000..c5e33ce
+--- /dev/null
++++ b/lib/shared/models/sensor.dart
+@@ -0,0 +1,7 @@
++// shared/models/sensor.dart
++class Sensor {
++  final String id;
++  final String name;
++  final String type; // "lidar" / "camera"
++  const Sensor({required this.id, required this.name, required this.type});
++}
+diff --git a/lib/shared/widgets/app_scaffold.dart b/lib/shared/widgets/app_scaffold.dart
+new file mode 100644
+index 0000000..bedb57d
+--- /dev/null
++++ b/lib/shared/widgets/app_scaffold.dart
+@@ -0,0 +1,29 @@
++// shared/widgets/app_scaffold.dart
++import 'package:flutter/material.dart';
++
++class AppScaffold extends StatelessWidget {
++  final PreferredSizeWidget toolbar;
++  final Widget left;
++  final Widget center;
++
++  const AppScaffold({
++    super.key,
++    required this.toolbar,
++    required this.left,
++    required this.center,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: toolbar,
++      body: Row(
++        children: [
++          SizedBox(width: 280, child: left),
++          const VerticalDivider(width: 1),
++          Expanded(child: center),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/shared/widgets/app_toolbar.dart b/lib/shared/widgets/app_toolbar.dart
+new file mode 100644
+index 0000000..8cde2d0
+--- /dev/null
++++ b/lib/shared/widgets/app_toolbar.dart
+@@ -0,0 +1,36 @@
++// shared/widgets/app_toolbar.dart
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../../features/streaming/streaming_providers.dart';
++
++class AppToolbar extends ConsumerWidget implements PreferredSizeWidget {
++  const AppToolbar({super.key});
++
++  @override
++  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final conn = ref.watch(connectionStateProvider);
++
++    return AppBar(
++      title: const Text('Sensor Studio'),
++      actions: [
++        conn.when(
++          data: (s) => Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text(s.name)),
++          ),
++          loading: () => const Padding(
++            padding: EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text('connecting...')),
++          ),
++          error: (_, __) => const Padding(
++            padding: EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text('error')),
++          ),
++        ),
++      ],
++    );
++  }
++}
+diff --git a/macos/Flutter/GeneratedPluginRegistrant.swift b/macos/Flutter/GeneratedPluginRegistrant.swift
+index cccf817..a8b637f 100644
+--- a/macos/Flutter/GeneratedPluginRegistrant.swift
++++ b/macos/Flutter/GeneratedPluginRegistrant.swift
+@@ -5,6 +5,8 @@
+ import FlutterMacOS
+ import Foundation
+ 
++import package_info_plus
+ 
+ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
++  FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
+ }
+diff --git a/pubspec.lock b/pubspec.lock
+index ceeae86..7d41502 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -33,6 +33,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.1.2"
++  code_assets:
++    dependency: transitive
++    description:
++      name: code_assets
++      sha256: "83ccdaa064c980b5596c35dd64a8d3ecc68620174ab9b90b6343b753aa721687"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.0"
+   collection:
+     dependency: transitive
+     description:
+@@ -41,6 +49,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.19.1"
++  crypto:
++    dependency: transitive
++    description:
++      name: crypto
++      sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.0.7"
+   cupertino_icons:
+     dependency: "direct main"
+     description:
+@@ -49,6 +65,22 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.0.8"
++  dio:
++    dependency: transitive
++    description:
++      name: dio
++      sha256: b9d46faecab38fc8cc286f80bc4d61a3bb5d4ac49e51ed877b4d6706efe57b25
++      url: "https://pub.dev"
++    source: hosted
++    version: "5.9.1"
++  dio_web_adapter:
++    dependency: transitive
++    description:
++      name: dio_web_adapter
++      sha256: "7586e476d70caecaf1686d21eee7247ea43ef5c345eab9e0cc3583ff13378d78"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.1.1"
+   fake_async:
+     dependency: transitive
+     description:
+@@ -57,6 +89,22 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.3.3"
++  ffi:
++    dependency: transitive
++    description:
++      name: ffi
++      sha256: "6d7fd89431262d8f3125e81b50d3847a091d846eafcd4fdb88dd06f36d705a45"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.2.0"
++  file:
++    dependency: transitive
++    description:
++      name: file
++      sha256: a3b4f84adafef897088c160faf7dfffb7696046cb13ae90b508c2cbc95d3b8d4
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.0.1"
+   flutter:
+     dependency: "direct main"
+     description: flutter
+@@ -70,11 +118,72 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "6.0.0"
++  flutter_multiplatform_logger:
++    dependency: "direct main"
++    description:
++      name: flutter_multiplatform_logger
++      sha256: "363e21145d2c6868b8a3bc98b98e4d5780a46b81394e75591a609b29ed9c1077"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.0"
++  flutter_riverpod:
++    dependency: "direct main"
++    description:
++      name: flutter_riverpod
++      sha256: "9532ee6db4a943a1ed8383072a2e3eeda041db5657cdf6d2acecf3c21ecbe7e1"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.6.1"
+   flutter_test:
+     dependency: "direct dev"
+     description: flutter
+     source: sdk
+     version: "0.0.0"
++  flutter_web_plugins:
++    dependency: transitive
++    description: flutter
++    source: sdk
++    version: "0.0.0"
++  glob:
++    dependency: transitive
++    description:
++      name: glob
++      sha256: c3f1ee72c96f8f78935e18aa8cecced9ab132419e8625dc187e1c2408efc20de
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.1.3"
++  hooks:
++    dependency: transitive
++    description:
++      name: hooks
++      sha256: "7a08a0d684cb3b8fb604b78455d5d352f502b68079f7b80b831c62220ab0a4f6"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.1"
++  http:
++    dependency: transitive
++    description:
++      name: http
++      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.6.0"
++  http_parser:
++    dependency: transitive
++    description:
++      name: http_parser
++      sha256: "178d74305e7866013777bab2c3d8726205dc5a4dd935297175b19a23a2e66571"
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.1.2"
++  intl:
++    dependency: transitive
++    description:
++      name: intl
++      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.20.2"
+   leak_tracker:
+     dependency: transitive
+     description:
+@@ -107,6 +216,22 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "6.1.0"
++  logging:
++    dependency: transitive
++    description:
++      name: logging
++      sha256: c8245ada5f1717ed44271ed1c26b8ce85ca3228fd2ffdb75468ab01979309d61
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.3.0"
++  logging_appenders:
++    dependency: transitive
++    description:
++      name: logging_appenders
++      sha256: "7fefa09636824f312432721c0bf77967ab19003116650729bd202bdf98142d70"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.4.0+1"
+   matcher:
+     dependency: transitive
+     description:
+@@ -131,6 +256,46 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.17.0"
++  mime:
++    dependency: transitive
++    description:
++      name: mime
++      sha256: "41a20518f0cb1256669420fdba0cd90d21561e560ac240f26ef8322e45bb7ed6"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.0.0"
++  native_toolchain_c:
++    dependency: transitive
++    description:
++      name: native_toolchain_c
++      sha256: "89e83885ba09da5fdf2cdacc8002a712ca238c28b7f717910b34bcd27b0d03ac"
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.17.4"
++  objective_c:
++    dependency: transitive
++    description:
++      name: objective_c
++      sha256: "100a1c87616ab6ed41ec263b083c0ef3261ee6cd1dc3b0f35f8ddfa4f996fe52"
++      url: "https://pub.dev"
++    source: hosted
++    version: "9.3.0"
++  package_info_plus:
++    dependency: transitive
++    description:
++      name: package_info_plus
++      sha256: f69da0d3189a4b4ceaeb1a3defb0f329b3b352517f52bed4290f83d4f06bc08d
++      url: "https://pub.dev"
++    source: hosted
++    version: "9.0.0"
++  package_info_plus_platform_interface:
++    dependency: transitive
++    description:
++      name: package_info_plus_platform_interface
++      sha256: "202a487f08836a592a6bd4f901ac69b3a8f146af552bbd14407b6b41e1c3f086"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.2.1"
+   path:
+     dependency: transitive
+     description:
+@@ -139,6 +304,94 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.9.1"
++  path_provider:
++    dependency: transitive
++    description:
++      name: path_provider
++      sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.1.5"
++  path_provider_android:
++    dependency: transitive
++    description:
++      name: path_provider_android
++      sha256: f2c65e21139ce2c3dad46922be8272bb5963516045659e71bb16e151c93b580e
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.2.22"
++  path_provider_foundation:
++    dependency: transitive
++    description:
++      name: path_provider_foundation
++      sha256: "2a376b7d6392d80cd3705782d2caa734ca4727776db0b6ec36ef3f1855197699"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.6.0"
++  path_provider_linux:
++    dependency: transitive
++    description:
++      name: path_provider_linux
++      sha256: f7a1fe3a634fe7734c8d3f2766ad746ae2a2884abe22e241a8b301bf5cac3279
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.2.1"
++  path_provider_platform_interface:
++    dependency: transitive
++    description:
++      name: path_provider_platform_interface
++      sha256: "88f5779f72ba699763fa3a3b06aa4bf6de76c8e5de842cf6f29e2e06476c2334"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.1.2"
++  path_provider_windows:
++    dependency: transitive
++    description:
++      name: path_provider_windows
++      sha256: bd6f00dbd873bfb70d0761682da2b3a2c2fccc2b9e84c495821639601d81afe7
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.3.0"
++  platform:
++    dependency: transitive
++    description:
++      name: platform
++      sha256: "5d6b1b0036a5f331ebc77c850ebc8506cbc1e9416c27e59b439f917a902a4984"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.1.6"
++  plugin_platform_interface:
++    dependency: transitive
++    description:
++      name: plugin_platform_interface
++      sha256: "4820fbfdb9478b1ebae27888254d445073732dae3d6ea81f0b7e06d5dedc3f02"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.1.8"
++  point_glass:
++    dependency: "direct main"
++    description:
++      name: point_glass
++      sha256: c347c8b4bcf8013a30c6430fc373072a378516d602e931ea1331a331149b4d73
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.1.1"
++  pub_semver:
++    dependency: transitive
++    description:
++      name: pub_semver
++      sha256: "5bfcf68ca79ef689f8990d1160781b4bad40a3bd5e5218ad4076ddb7f4081585"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.2.0"
++  riverpod:
++    dependency: transitive
++    description:
++      name: riverpod
++      sha256: "59062512288d3056b2321804332a13ffdd1bf16df70dcc8e506e411280a72959"
++      url: "https://pub.dev"
++    source: hosted
++    version: "2.6.1"
+   sky_engine:
+     dependency: transitive
+     description: flutter
+@@ -160,6 +413,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.12.1"
++  state_notifier:
++    dependency: transitive
++    description:
++      name: state_notifier
++      sha256: b8677376aa54f2d7c58280d5a007f9e8774f1968d1fb1c096adcb4792fba29bb
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.0"
+   stream_channel:
+     dependency: transitive
+     description:
+@@ -192,6 +453,22 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "0.7.8"
++  typed_data:
++    dependency: transitive
++    description:
++      name: typed_data
++      sha256: f9049c039ebfeb4cf7a7104a675823cd72dba8297f264b6637062516699fa006
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.4.0"
++  universal_platform:
++    dependency: transitive
++    description:
++      name: universal_platform
++      sha256: "64e16458a0ea9b99260ceb5467a214c1f298d647c659af1bff6d3bf82536b1ec"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.1.0"
+   vector_math:
+     dependency: transitive
+     description:
+@@ -208,6 +485,54 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "15.0.2"
++  web:
++    dependency: transitive
++    description:
++      name: web
++      sha256: "868d88a33d8a87b18ffc05f9f030ba328ffefba92d6c127917a2ba740f9cfe4a"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.1.1"
++  web_socket:
++    dependency: transitive
++    description:
++      name: web_socket
++      sha256: "34d64019aa8e36bf9842ac014bb5d2f5586ca73df5e4d9bf5c936975cae6982c"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.1"
++  web_socket_channel:
++    dependency: "direct main"
++    description:
++      name: web_socket_channel
++      sha256: d645757fb0f4773d602444000a8131ff5d48c9e47adfe9772652dd1a4f2d45c8
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.0.3"
++  win32:
++    dependency: transitive
++    description:
++      name: win32
++      sha256: d7cb55e04cd34096cd3a79b3330245f54cb96a370a1c27adb3c84b917de8b08e
++      url: "https://pub.dev"
++    source: hosted
++    version: "5.15.0"
++  xdg_directories:
++    dependency: transitive
++    description:
++      name: xdg_directories
++      sha256: "7a3f37b05d989967cdddcbb571f1ea834867ae2faa29725fd085180e0883aa15"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.1.0"
++  yaml:
++    dependency: transitive
++    description:
++      name: yaml
++      sha256: b9da305ac7c39faa3f030eccd175340f968459dae4af175130b3fc47e40d76ce
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.1.3"
+ sdks:
+   dart: ">=3.11.0 <4.0.0"
+-  flutter: ">=3.18.0-18.0.pre.54"
++  flutter: ">=3.38.4"
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 701cceb..ad9b051 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -34,6 +34,10 @@ dependencies:
+   # The following adds the Cupertino Icons font to your application.
+   # Use with the CupertinoIcons class for iOS style icons.
+   cupertino_icons: ^1.0.8
++  point_glass: ^1.1.1
++  flutter_multiplatform_logger: ^1.0.0
++  flutter_riverpod: ^2.5.1
++  web_socket_channel: ^3.0.3
+ 
+ dev_dependencies:
+   flutter_test:
+diff --git a/test/widget_test.dart b/test/widget_test.dart
+index 99f5986..88ab732 100644
+--- a/test/widget_test.dart
++++ b/test/widget_test.dart
+@@ -7,13 +7,14 @@
+ 
+ import 'package:flutter/material.dart';
+ import 'package:flutter_test/flutter_test.dart';
++import 'package:sensor_studio/app.dart';
+ 
+ import 'package:sensor_studio/main.dart';
+ 
+ void main() {
+   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+     // Build our app and trigger a frame.
+-    await tester.pumpWidget(const MyApp());
++    await tester.pumpWidget(const SensorStudioApp());
+ 
+     // Verify that our counter starts at 0.
+     expect(find.text('0'), findsOneWidget);
