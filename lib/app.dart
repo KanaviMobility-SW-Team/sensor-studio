@@ -1,5 +1,6 @@
 // app.dart
 import 'package:flutter/material.dart';
+import 'package:sensor_studio/features/sensor/widgets/sensor_setting_panel.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/app_scaffold.dart';
 import 'shared/widgets/app_toolbar.dart';
@@ -29,6 +30,7 @@ class MainScreen extends StatelessWidget {
       toolbar: const AppToolbar(),
       left: const SensorListPanel(),
       center: const PointCloudViewer(),
+      right: const SensorSettingPanel(),
     );
   }
 }

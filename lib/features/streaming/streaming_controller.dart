@@ -2,7 +2,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_multiplatform_logger/flutter_multiplatform_logger.dart';
+
 import 'package:sensor_studio/features/sensor/sensor_providers.dart';
 
 import '../../shared/models/frame.dart';
@@ -14,6 +17,7 @@ enum ConnectionStateX { disconnected, connecting, connected, error }
 class StreamingController {
   final WsClient _client;
   final Ref _ref;
+  final _logger = Logger("StreamingController");
 
   StreamSubscription? _sub;
 
@@ -32,6 +36,7 @@ class StreamingController {
 
   Future<void> connect(Uri uri) async {
     _conn.add(ConnectionStateX.connecting);
+
     try {
       await _client.connect(uri);
       _conn.add(ConnectionStateX.connected);
@@ -44,10 +49,12 @@ class StreamingController {
               .read(sensorListNotifierProvider.notifier)
               .updateFromServer(jsonMap);
         } else if (data is Uint8List || data is List<int>) {
-          print("Binary data received");
-          final frame = WsProtocol.decode(data);
+          final frame = WsProtocol.decodeLidarFrame(data);
+          for (final controller in _sensorStreams.values) {
+            controller.add(frame);
+          }
         } else {
-          print("Unknown data type: ${data.runtimeType}");
+          _logger.severe("Unknown data type: ${data.runtimeType}");
         }
       }, onError: (_) => _conn.add(ConnectionStateX.error));
     } catch (_) {
@@ -73,6 +80,10 @@ class StreamingController {
         "subscriptionIds": [0],
       }),
     );
+  }
+
+  void sendMessage(String message) {
+    _client.sendString(message);
   }
 
   Future<void> dispose() async {

@@ -16,13 +16,14 @@ class SensorListPanel extends ConsumerWidget {
       children: [
         const Padding(
           padding: EdgeInsets.all(12),
-          child: Text('Sensors', style: TextStyle(fontSize: 14)),
+          child: Text('Sensor List', style: TextStyle(fontSize: 14)),
         ),
         for (final s in sensors)
           SensorListItem(
             sensor: s,
             selected: selectedId == s.id,
-            onTap: () => ref.read(selectedSensorIdProvider.notifier).state = s.id,
+            onTap: () =>
+                ref.read(selectedSensorIdProvider.notifier).state = s.id,
           ),
       ],
     );

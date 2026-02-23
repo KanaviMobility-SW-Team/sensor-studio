@@ -6,6 +6,5 @@ import 'app.dart';
 
 void main() async {
   await FlutterMultiplatformLogger.init();
-
   runApp(const ProviderScope(child: SensorStudioApp()));
 }

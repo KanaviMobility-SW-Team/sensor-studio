@@ -27,3 +27,20 @@ final sensorListNotifierProvider =
     );
 
 final selectedSensorIdProvider = StateProvider<String?>((ref) => null);
+
+class SensorFilter {
+  final List<int> intensityMin;
+  final List<int> intensityMax;
+
+  SensorFilter({List<int>? intensityMin, List<int>? intensityMax})
+    : intensityMin = intensityMin ?? [0, 0, 0, 0],
+      intensityMax =
+          intensityMax ?? [4294967295, 4294967295, 4294967295, 4294967295];
+
+  int getMin(int echo) => intensityMin[echo];
+  int getMax(int echo) => intensityMax[echo];
+}
+
+final sensorFilterProvider = StateProvider<SensorFilter>(
+  (ref) => SensorFilter(),
+);

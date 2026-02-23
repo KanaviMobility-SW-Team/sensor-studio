@@ -15,7 +15,10 @@ class WsClient {
     _ch = WebSocketChannel.connect(uri);
     _ch!.stream.listen(
       (data) {
-        _logger.info('WsClient received data: ${data}');
+        if (data is String) {
+          _logger.info('WsClient received text: $data');
+        }
+
         _incoming.add(data);
       },
       onError: _incoming.addError,
@@ -24,7 +27,7 @@ class WsClient {
   }
 
   void send(Uint8List bytes) {
-    _logger.info('WsClient sending data: ${bytes}');
+    _logger.info('WsClient sending binary: ${bytes.length} bytes');
     _ch?.sink.add(bytes);
   }
 
