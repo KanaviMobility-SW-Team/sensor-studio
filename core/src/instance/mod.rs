@@ -1,5 +1,9 @@
-use crate::engine::EngineId;
 use std::collections::HashMap;
+use std::io;
+
+use crate::engine::Engine;
+use crate::transport::udp::UdpTransport;
+use crate::types::PointCloudFrame;
 
 pub type InstanceId = String;
 
@@ -11,20 +15,43 @@ pub enum InstanceState {
     Error,
 }
 
-#[derive(Clone, Debug)]
 pub struct Instance {
     pub id: InstanceId,
-    pub engine_id: EngineId,
     pub state: InstanceState,
+    engine: Box<dyn Engine>,
+    transport: UdpTransport,
 }
 
 impl Instance {
-    pub fn new(id: impl Into<String>, engine_id: EngineId) -> Self {
+    pub fn new(id: impl Into<String>, engine: Box<dyn Engine>, transport: UdpTransport) -> Self {
         Self {
             id: id.into(),
-            engine_id,
             state: InstanceState::Created,
+            engine,
+            transport,
         }
+    }
+
+    pub fn engine_id(&self) -> &str {
+        self.engine.id()
+    }
+
+    pub fn transport_id(&self) -> &str {
+        self.transport.id()
+    }
+
+    pub async fn run_once(&mut self) -> io::Result<Vec<PointCloudFrame>> {
+        match self.transport.read_chunk().await? {
+            Some((_sender_addr, chunk)) => {
+                let frames = self.engine.process(chunk);
+                Ok(frames)
+            }
+            None => Ok(Vec::new()),
+        }
+    }
+
+    pub fn set_state(&mut self, state: InstanceState) {
+        self.state = state;
     }
 }
 
@@ -56,8 +83,8 @@ impl InstanceManager {
         self.instances.remove(id)
     }
 
-    pub fn list(&self) -> Vec<&Instance> {
-        self.instances.values().collect()
+    pub fn ids(&self) -> Vec<&str> {
+        self.instances.keys().map(|k| k.as_str()).collect()
     }
 
     pub fn count(&self) -> usize {
