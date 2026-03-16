@@ -8,9 +8,11 @@ mod types;
 
 use std::net::{Ipv4Addr, SocketAddr};
 
-use engine::mock::MockEngine;
-use instance::Instance;
-use transport::udp::{UdpTransport, UdpTransportConfig};
+use crate::engine::mock::MockEngine;
+use crate::instance::Instance;
+use crate::stream::StreamPublisher;
+use crate::stream::console::ConsolePublisher;
+use crate::transport::udp::{UdpTransport, UdpTransportConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine = Box::new(MockEngine::new("mock-engine"));
 
     let mut instance = Instance::new("instance-1", engine, transport);
+    let mut publisher = ConsolePublisher::new();
 
     println!("Waiting for one UDP datagram...");
 
@@ -35,13 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Processed {} frame(s)", frames.len());
 
-    for (index, frame) in frames.iter().enumerate() {
-        println!(
-            "frame[{index}]: frame_id={}, points={}, data_size={} bytes",
-            frame.frame_id,
-            frame.point_count(),
-            frame.data.len()
-        );
+    for frame in frames {
+        publisher.publish(frame);
     }
 
     Ok(())
