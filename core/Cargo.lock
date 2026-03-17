@@ -451,6 +451,7 @@ dependencies = [
  "axum",
  "bytes",
  "network-interface",
+ "serde_json",
  "socket2",
  "tokio",
 ]

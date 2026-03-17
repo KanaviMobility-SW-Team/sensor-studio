@@ -8,6 +8,9 @@ use axum::routing::get;
 use tokio::sync::broadcast;
 
 use crate::stream::websocket::WebSocketMessage;
+use crate::stream::websocket::foxglove::{
+    FOXGLOVE_SUBPROTOCOL, foxglove_advertise_message, foxglove_server_info_message,
+};
 
 #[derive(Clone)]
 pub struct WebSocketServerState {
@@ -37,13 +40,30 @@ impl WebSocketServer {
         State(state): State<WebSocketServerState>,
         ws: WebSocketUpgrade,
     ) -> Response {
-        ws.on_upgrade(move |socket| Self::handle_socket(socket, state.sender.subscribe()))
+        ws.protocols([FOXGLOVE_SUBPROTOCOL])
+            .on_upgrade(move |socket| Self::handle_socket(socket, state.sender.subscribe()))
     }
 
     async fn handle_socket(
         mut socket: WebSocket,
         mut receiver: broadcast::Receiver<WebSocketMessage>,
     ) {
+        if socket
+            .send(Message::Text(foxglove_server_info_message().into()))
+            .await
+            .is_err()
+        {
+            return;
+        }
+
+        if socket
+            .send(Message::Text(foxglove_advertise_message().into()))
+            .await
+            .is_err()
+        {
+            return;
+        }
+
         while let Ok(message) = receiver.recv().await {
             let text = match message {
                 WebSocketMessage::Text(text) => text,
