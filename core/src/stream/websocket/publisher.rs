@@ -16,13 +16,6 @@ impl WebSocketPublisher {
 
 impl StreamPublisher for WebSocketPublisher {
     fn publish(&mut self, frame: PointCloudFrame) {
-        let message = WebSocketMessage::Text(format!(
-            "frame: frame_id={}, points={}, data_size={}",
-            frame.frame_id,
-            frame.point_count(),
-            frame.data.len()
-        ));
-
-        let _ = self.sender.send(message);
+        let _ = self.sender.send(WebSocketMessage::Frame(frame));
     }
 }

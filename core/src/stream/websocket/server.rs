@@ -45,11 +45,18 @@ impl WebSocketServer {
         mut receiver: broadcast::Receiver<WebSocketMessage>,
     ) {
         while let Ok(message) = receiver.recv().await {
-            let send_result = match message {
-                WebSocketMessage::Text(text) => socket.send(Message::Text(text.into())).await,
+            let text = match message {
+                WebSocketMessage::Text(text) => text,
+                WebSocketMessage::Frame(frame) => {
+                    let point_count = frame.point_count();
+                    let data_size = frame.data.len();
+                    let frame_id = frame.frame_id;
+
+                    format!("frame_id={frame_id}, point_count={point_count}, data_size={data_size}")
+                }
             };
 
-            if send_result.is_err() {
+            if socket.send(Message::Text(text.into())).await.is_err() {
                 break;
             }
         }
