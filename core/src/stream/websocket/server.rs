@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::State;
@@ -7,12 +8,12 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::broadcast;
+use tokio::sync::{Mutex, broadcast};
 
 use crate::stream::websocket::WebSocketMessage;
 use crate::stream::websocket::foxglove::{
-    FOXGLOVE_SUBPROTOCOL, FoxgloveClientMessage, foxglove_advertise_message,
-    foxglove_server_info_message,
+    FOXGLOVE_SUBPROTOCOL, FoxgloveClientCommand, FoxgloveClientMessage, encode_point_cloud_payload,
+    foxglove_advertise_message, foxglove_server_info_message, make_message_data_frame,
 };
 
 #[derive(Clone)]
@@ -66,26 +67,38 @@ impl WebSocketServer {
             return;
         }
 
-        let mut subscriptions: HashMap<u32, u32> = HashMap::new();
+        let subscriptions = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
+
+        let send_subscriptions = Arc::clone(&subscriptions);
+        let recv_subscriptions = Arc::clone(&subscriptions);
 
         let mut rx = receiver;
         let send_task = tokio::spawn(async move {
             while let Ok(message) = rx.recv().await {
-                let text = match message {
-                    WebSocketMessage::Text(text) => text,
-                    WebSocketMessage::Frame(frame) => {
-                        let point_count = frame.point_count();
-                        let data_size = frame.data.len();
-                        let frame_id = frame.frame_id;
-
-                        format!(
-                            "frame_id={frame_id}, point_count={point_count}, data_size={data_size}"
-                        )
+                match message {
+                    WebSocketMessage::Text(text) => {
+                        if sender.send(Message::Text(text.into())).await.is_err() {
+                            break;
+                        }
                     }
-                };
+                    WebSocketMessage::Frame(frame) => {
+                        let subscriptions = send_subscriptions.lock().await;
 
-                if sender.send(Message::Text(text.into())).await.is_err() {
-                    break;
+                        for (subscription_id, channel_id) in subscriptions.iter() {
+                            if *channel_id != 1 {
+                                continue;
+                            }
+
+                            let timestamp_ns = frame.timestamp_ns;
+                            let payload = encode_point_cloud_payload(&frame);
+                            let binary =
+                                make_message_data_frame(*subscription_id, timestamp_ns, &payload);
+
+                            if sender.send(Message::Binary(binary.into())).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -97,20 +110,28 @@ impl WebSocketServer {
                         if let Ok(client_message) =
                             serde_json::from_str::<FoxgloveClientMessage>(&text)
                         {
-                            match client_message {
-                                FoxgloveClientMessage::Subscribe {
-                                    subscription_id,
-                                    channel_id,
-                                } => {
-                                    subscriptions.insert(subscription_id, channel_id);
-                                    println!(
-                                        "Subscribed: subscription_id={}, channel_id={}",
-                                        subscription_id, channel_id
-                                    );
-                                }
-                                FoxgloveClientMessage::Unsubscribe { subscription_id } => {
-                                    subscriptions.remove(&subscription_id);
-                                    println!("Unsubscribed: subscription_id={}", subscription_id);
+                            let commands = client_message.into_commands();
+                            let mut subscriptions = recv_subscriptions.lock().await;
+
+                            for command in commands {
+                                match command {
+                                    FoxgloveClientCommand::Subscribe {
+                                        subscription_id,
+                                        channel_id,
+                                    } => {
+                                        subscriptions.insert(subscription_id, channel_id);
+                                        println!(
+                                            "subscribe: subscription_id={}, channel_id={}",
+                                            subscription_id, channel_id
+                                        );
+                                    }
+                                    FoxgloveClientCommand::Unsubscribe { subscription_id } => {
+                                        subscriptions.remove(&subscription_id);
+                                        println!(
+                                            "unsubscribe: subscription_id={}",
+                                            subscription_id
+                                        );
+                                    }
                                 }
                             }
                         }
