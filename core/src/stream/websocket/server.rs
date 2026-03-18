@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 
 use axum::Router;
@@ -5,11 +6,13 @@ use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::get;
+use futures_util::{SinkExt, StreamExt};
 use tokio::sync::broadcast;
 
 use crate::stream::websocket::WebSocketMessage;
 use crate::stream::websocket::foxglove::{
-    FOXGLOVE_SUBPROTOCOL, foxglove_advertise_message, foxglove_server_info_message,
+    FOXGLOVE_SUBPROTOCOL, FoxgloveClientMessage, foxglove_advertise_message,
+    foxglove_server_info_message,
 };
 
 #[derive(Clone)]
@@ -44,11 +47,10 @@ impl WebSocketServer {
             .on_upgrade(move |socket| Self::handle_socket(socket, state.sender.subscribe()))
     }
 
-    async fn handle_socket(
-        mut socket: WebSocket,
-        mut receiver: broadcast::Receiver<WebSocketMessage>,
-    ) {
-        if socket
+    async fn handle_socket(socket: WebSocket, receiver: broadcast::Receiver<WebSocketMessage>) {
+        let (mut sender, mut incoming) = socket.split();
+
+        if sender
             .send(Message::Text(foxglove_server_info_message().into()))
             .await
             .is_err()
@@ -56,7 +58,7 @@ impl WebSocketServer {
             return;
         }
 
-        if socket
+        if sender
             .send(Message::Text(foxglove_advertise_message().into()))
             .await
             .is_err()
@@ -64,21 +66,61 @@ impl WebSocketServer {
             return;
         }
 
-        while let Ok(message) = receiver.recv().await {
-            let text = match message {
-                WebSocketMessage::Text(text) => text,
-                WebSocketMessage::Frame(frame) => {
-                    let point_count = frame.point_count();
-                    let data_size = frame.data.len();
-                    let frame_id = frame.frame_id;
+        let mut subscriptions: HashMap<u32, u32> = HashMap::new();
 
-                    format!("frame_id={frame_id}, point_count={point_count}, data_size={data_size}")
+        let mut rx = receiver;
+        let send_task = tokio::spawn(async move {
+            while let Ok(message) = rx.recv().await {
+                let text = match message {
+                    WebSocketMessage::Text(text) => text,
+                    WebSocketMessage::Frame(frame) => {
+                        let point_count = frame.point_count();
+                        let data_size = frame.data.len();
+                        let frame_id = frame.frame_id;
+
+                        format!(
+                            "frame_id={frame_id}, point_count={point_count}, data_size={data_size}"
+                        )
+                    }
+                };
+
+                if sender.send(Message::Text(text.into())).await.is_err() {
+                    break;
                 }
-            };
-
-            if socket.send(Message::Text(text.into())).await.is_err() {
-                break;
             }
-        }
+        });
+
+        let recv_task = tokio::spawn(async move {
+            while let Some(Ok(message)) = incoming.next().await {
+                match message {
+                    Message::Text(text) => {
+                        if let Ok(client_message) =
+                            serde_json::from_str::<FoxgloveClientMessage>(&text)
+                        {
+                            match client_message {
+                                FoxgloveClientMessage::Subscribe {
+                                    subscription_id,
+                                    channel_id,
+                                } => {
+                                    subscriptions.insert(subscription_id, channel_id);
+                                    println!(
+                                        "Subscribed: subscription_id={}, channel_id={}",
+                                        subscription_id, channel_id
+                                    );
+                                }
+                                FoxgloveClientMessage::Unsubscribe { subscription_id } => {
+                                    subscriptions.remove(&subscription_id);
+                                    println!("Unsubscribed: subscription_id={}", subscription_id);
+                                }
+                            }
+                        }
+                    }
+                    Message::Close(_) => break,
+                    _ => {}
+                }
+            }
+        });
+
+        let _ = tokio::join!(send_task, recv_task);
     }
 }

@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use serde_json::json;
 
 pub const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.websocket.v1";
@@ -27,4 +28,17 @@ pub fn foxglove_advertise_message() -> String {
         ]
     })
     .to_string()
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "op")]
+pub enum FoxgloveClientMessage {
+    #[serde(rename = "subscribe")]
+    Subscribe {
+        subscription_id: u32,
+        channel_id: u32,
+    },
+
+    #[serde(rename = "unsubscribe")]
+    Unsubscribe { subscription_id: u32 },
 }
