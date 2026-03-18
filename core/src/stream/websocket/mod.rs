@@ -1,3 +1,4 @@
+pub mod foxglove;
 pub mod message;
 pub mod publisher;
 pub mod server;
