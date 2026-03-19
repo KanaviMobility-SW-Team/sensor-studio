@@ -83,7 +83,7 @@ impl ChannelRegistry {
             .find(|channel| channel.id == channel_id)
     }
 
-    pub fn get_by_source(&self, source_id: &str) -> Option<&ChannelDescriptor> {
+    pub fn get_by_source(&self, source_id: String) -> Option<&ChannelDescriptor> {
         self.channels
             .iter()
             .find(|channel| channel.source.id == source_id)

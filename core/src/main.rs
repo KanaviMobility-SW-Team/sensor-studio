@@ -36,12 +36,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         encoder: ChannelEncoderConfig::Json,
     }];
 
+    let publish_source_id = channel_configs[0].source_id.clone();
+
     let channel_registry = Arc::new(ChannelRegistry::from_configs(&channel_configs));
 
     let ws_state = WebSocketServerState {
         sender: sender.clone(),
         channel_registry,
     };
+
+    let mut publisher = WebSocketPublisher::new(sender, publish_source_id);
 
     tokio::spawn(async move {
         if let Err(error) = WebSocketServer::serve(ws_bind_addr, ws_state).await {
@@ -61,7 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine = Box::new(MockEngine::new("mock-engine"));
 
     let mut instance = Instance::new("instance-1", engine, transport);
-    let mut publisher = WebSocketPublisher::new(sender, "mock_sensor");
 
     println!("Waiting for one UDP datagram...");
     println!("WebSocket server listening on {}", ws_bind_addr);
