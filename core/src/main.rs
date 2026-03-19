@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine = Box::new(MockEngine::new("mock-engine"));
 
     let mut instance = Instance::new("instance-1", engine, transport);
-    let mut publisher = WebSocketPublisher::new(sender);
+    let mut publisher = WebSocketPublisher::new(sender, "mock_sensor");
 
     println!("Waiting for one UDP datagram...");
     println!("WebSocket server listening on {}", ws_bind_addr);

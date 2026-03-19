@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::stream::channel::{ChannelDescriptor, ChannelRegistry, ChannelSchema};
+use crate::stream::channel::{ChannelDescriptor, ChannelEncoder, ChannelRegistry, ChannelSchema};
 
 pub const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.websocket.v1";
 
@@ -16,27 +16,27 @@ pub fn foxglove_server_info_message() -> String {
     .to_string()
 }
 
-fn channel_to_foxglove_advertise(channel: &ChannelDescriptor) -> Value {
-    match channel.message_schema {
-        ChannelSchema::PointCloud => {
-            json!({
-                "id": channel.id,
-                "topic": channel.topic,
-                "encoding": "json",
-                "schemaName": "foxglove.PointCloud",
-                "schema": "",
-            })
-        }
-        ChannelSchema::Status => {
-            json!({
-                "id": channel.id,
-                "topic": channel.topic,
-                "encoding": "json",
-                "schemaName": "foxglove.RawMessage",
-                "schema": "",
-            })
-        }
+fn foxglove_encoding(encoder: ChannelEncoder) -> &'static str {
+    match encoder {
+        ChannelEncoder::Json => "json",
     }
+}
+
+fn foxglove_schema_name(schema: ChannelSchema) -> &'static str {
+    match schema {
+        ChannelSchema::PointCloud => "foxglove.PointCloud",
+        ChannelSchema::Status => "foxglove.RawMessage",
+    }
+}
+
+fn channel_to_foxglove_advertise(channel: &ChannelDescriptor) -> Value {
+    json!({
+        "id": channel.id,
+        "topic": channel.topic,
+        "encoding": foxglove_encoding(channel.encoder),
+        "schemaName": foxglove_schema_name(channel.message_schema),
+        "schema": "",
+    })
 }
 
 pub fn foxglove_advertise_message(registry: &ChannelRegistry) -> String {
