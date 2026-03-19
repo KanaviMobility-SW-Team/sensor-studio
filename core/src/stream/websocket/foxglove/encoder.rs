@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::types::PointCloudFrame;
+use crate::types::{PointCloudFrame, PointFieldDataType};
 
 pub fn make_message_data_frame(subscription_id: u32, timestamp_ns: u64, payload: &[u8]) -> Vec<u8> {
     let mut frame = Vec::with_capacity(1 + 4 + 8 + payload.len());
@@ -29,7 +29,7 @@ pub fn encode_point_cloud_payload(frame: &PointCloudFrame) -> Vec<u8> {
             json!({
                 "name": field.name,
                 "offset": field.offset,
-                "type": foxglove_field_type(field.datatype as u8),
+                "type": to_foxglove_numeric_type(field.datatype),
             })
         }).collect::<Vec<_>>(),
         "data": frame.data,
@@ -38,16 +38,15 @@ pub fn encode_point_cloud_payload(frame: &PointCloudFrame) -> Vec<u8> {
     serde_json::to_vec(&payload).unwrap_or_default()
 }
 
-fn foxglove_field_type(datatype: u8) -> &'static str {
+fn to_foxglove_numeric_type(datatype: PointFieldDataType) -> u8 {
     match datatype {
-        1 => "int8",
-        2 => "uint8",
-        3 => "int16",
-        4 => "uint16",
-        5 => "int32",
-        6 => "uint32",
-        7 => "float32",
-        8 => "float64",
-        _ => "uint8",
+        PointFieldDataType::Uint8 => 1,
+        PointFieldDataType::Int8 => 2,
+        PointFieldDataType::Uint16 => 3,
+        PointFieldDataType::Int16 => 4,
+        PointFieldDataType::Uint32 => 5,
+        PointFieldDataType::Int32 => 6,
+        PointFieldDataType::Float32 => 7,
+        PointFieldDataType::Float64 => 8,
     }
 }
