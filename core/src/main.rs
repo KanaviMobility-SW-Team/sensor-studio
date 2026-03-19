@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
+use crate::config::{ChannelEncoderConfig, ChannelSchemaConfig, InstanceChannelConfig};
 use crate::engine::mock::MockEngine;
 use crate::instance::Instance;
 use crate::stream::StreamPublisher;
@@ -27,7 +28,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender, _) = broadcast::channel::<WebSocketMessage>(32);
 
-    let channel_registry = Arc::new(ChannelRegistry::mock_pointcloud());
+    let channel_configs = vec![InstanceChannelConfig {
+        channel_id: 1,
+        source_id: "mock_sensor".to_string(),
+        topic: "/pointcloud/mock".to_string(),
+        schema: ChannelSchemaConfig::PointCloud,
+        encoder: ChannelEncoderConfig::Json,
+    }];
+
+    let channel_registry = Arc::new(ChannelRegistry::from_configs(&channel_configs));
 
     let ws_state = WebSocketServerState {
         sender: sender.clone(),
