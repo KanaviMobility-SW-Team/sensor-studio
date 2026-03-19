@@ -1,7 +1,19 @@
+use std::net::{Ipv4Addr, SocketAddr};
+
 #[derive(Clone, Debug)]
 pub struct InstanceRuntimeConfig {
     pub instance_id: String,
+    pub transport: UdpTransportRuntimeConfig,
     pub channel: InstanceChannelConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct UdpTransportRuntimeConfig {
+    pub bind_addr: SocketAddr,
+    pub buffer_size: usize,
+    pub multicast_addr: Option<Ipv4Addr>,
+    pub join_all_interfaces: bool,
+    pub interface_addrs: Vec<Ipv4Addr>,
 }
 
 #[derive(Clone, Debug)]
