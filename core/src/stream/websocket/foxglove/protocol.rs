@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::stream::channel::{ChannelDescriptor, ChannelMessageKind, ChannelRegistry};
+use crate::stream::channel::{ChannelDescriptor, ChannelRegistry, ChannelSchema};
 
 pub const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.websocket.v1";
 
@@ -17,8 +17,8 @@ pub fn foxglove_server_info_message() -> String {
 }
 
 fn channel_to_foxglove_advertise(channel: &ChannelDescriptor) -> Value {
-    match channel.message_kind {
-        ChannelMessageKind::PointCloud => {
+    match channel.message_schema {
+        ChannelSchema::PointCloud => {
             json!({
                 "id": channel.id,
                 "topic": channel.topic,
@@ -27,7 +27,7 @@ fn channel_to_foxglove_advertise(channel: &ChannelDescriptor) -> Value {
                 "schema": "",
             })
         }
-        ChannelMessageKind::Status => {
+        ChannelSchema::Status => {
             json!({
                 "id": channel.id,
                 "topic": channel.topic,
