@@ -13,7 +13,7 @@ use tokio::sync::broadcast;
 
 use crate::config::{
     ChannelEncoderConfig, ChannelSchemaConfig, InstanceChannelConfig, InstanceRuntimeConfig,
-    UdpTransportRuntimeConfig,
+    TransportRuntimeConfig, UdpTransportRuntimeConfig,
 };
 use crate::engine::mock::MockEngine;
 use crate::instance::Instance;
@@ -32,13 +32,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let instance_configs = vec![InstanceRuntimeConfig {
         instance_id: "instance-1".to_string(),
-        transport: UdpTransportRuntimeConfig {
+        transport: TransportRuntimeConfig::Udp(UdpTransportRuntimeConfig {
             bind_addr: "0.0.0.0:5000".parse()?,
             buffer_size: 4096,
             multicast_addr: Some(Ipv4Addr::new(224, 0, 0, 5)),
             join_all_interfaces: true,
             interface_addrs: vec![],
-        },
+        }),
         channel: InstanceChannelConfig {
             channel_id: 1,
             source_id: "mock_sensor".to_string(),
@@ -54,15 +54,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let channel_registry = Arc::new(ChannelRegistry::from_instance_configs(&instance_configs));
 
-    let transport_config = UdpTransportConfig {
-        bind_addr: instance_config.transport.bind_addr,
-        buffer_size: instance_config.transport.buffer_size,
-        multicast_addr: instance_config.transport.multicast_addr,
-        join_all_interfaces: instance_config.transport.join_all_interfaces,
-        interface_addrs: instance_config.transport.interface_addrs.clone(),
+    let transport = match &instance_config.transport {
+        TransportRuntimeConfig::Udp(config) => {
+            let transport_config = UdpTransportConfig {
+                bind_addr: config.bind_addr,
+                buffer_size: config.buffer_size,
+                multicast_addr: config.multicast_addr,
+                join_all_interfaces: config.join_all_interfaces,
+                interface_addrs: config.interface_addrs.clone(),
+            };
+
+            UdpTransport::bind("udp-test".to_string(), transport_config).await?
+        }
     };
 
-    let transport = UdpTransport::bind("udp-test".to_string(), transport_config).await?;
     let engine = Box::new(MockEngine::new("mock-engine"));
     let mut instance = Instance::new(instance_config.instance_id.clone(), engine, transport);
 

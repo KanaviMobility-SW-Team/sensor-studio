@@ -3,8 +3,13 @@ use std::net::{Ipv4Addr, SocketAddr};
 #[derive(Clone, Debug)]
 pub struct InstanceRuntimeConfig {
     pub instance_id: String,
-    pub transport: UdpTransportRuntimeConfig,
+    pub transport: TransportRuntimeConfig,
     pub channel: InstanceChannelConfig,
+}
+
+#[derive(Clone, Debug)]
+pub enum TransportRuntimeConfig {
+    Udp(UdpTransportRuntimeConfig),
 }
 
 #[derive(Clone, Debug)]
