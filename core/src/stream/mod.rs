@@ -1,3 +1,4 @@
+pub mod channel;
 pub mod console;
 pub mod publisher;
 pub mod websocket;

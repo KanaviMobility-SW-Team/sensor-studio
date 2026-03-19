@@ -10,6 +10,7 @@ use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{Mutex, broadcast};
 
+use crate::stream::channel::ChannelRegistry;
 use crate::stream::websocket::WebSocketMessage;
 use crate::stream::websocket::foxglove::{
     FOXGLOVE_SUBPROTOCOL, FoxgloveClientCommand, FoxgloveClientMessage, encode_point_cloud_payload,
@@ -19,6 +20,7 @@ use crate::stream::websocket::foxglove::{
 #[derive(Clone)]
 pub struct WebSocketServerState {
     pub sender: broadcast::Sender<WebSocketMessage>,
+    pub channel_registry: Arc<ChannelRegistry>,
 }
 
 pub struct WebSocketServer;
@@ -45,10 +47,20 @@ impl WebSocketServer {
         ws: WebSocketUpgrade,
     ) -> Response {
         ws.protocols([FOXGLOVE_SUBPROTOCOL])
-            .on_upgrade(move |socket| Self::handle_socket(socket, state.sender.subscribe()))
+            .on_upgrade(move |socket| {
+                Self::handle_socket(
+                    socket,
+                    state.sender.subscribe(),
+                    state.channel_registry.clone(),
+                )
+            })
     }
 
-    async fn handle_socket(socket: WebSocket, receiver: broadcast::Receiver<WebSocketMessage>) {
+    async fn handle_socket(
+        socket: WebSocket,
+        receiver: broadcast::Receiver<WebSocketMessage>,
+        channel_registry: Arc<ChannelRegistry>,
+    ) {
         let (mut sender, mut incoming) = socket.split();
 
         if sender
@@ -60,7 +72,9 @@ impl WebSocketServer {
         }
 
         if sender
-            .send(Message::Text(foxglove_advertise_message().into()))
+            .send(Message::Text(
+                foxglove_advertise_message(channel_registry.as_ref()).into(),
+            ))
             .await
             .is_err()
         {
@@ -85,7 +99,7 @@ impl WebSocketServer {
                         let subscriptions = send_subscriptions.lock().await;
 
                         for (subscription_id, channel_id) in subscriptions.iter() {
-                            if *channel_id != 1 {
+                            if !channel_registry.contains(*channel_id) {
                                 continue;
                             }
 
