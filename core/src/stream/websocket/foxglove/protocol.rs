@@ -1,5 +1,7 @@
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
+
+use crate::stream::channel::{ChannelDescriptor, ChannelMessageKind, ChannelRegistry};
 
 pub const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.websocket.v1";
 
@@ -14,18 +16,39 @@ pub fn foxglove_server_info_message() -> String {
     .to_string()
 }
 
-pub fn foxglove_advertise_message() -> String {
-    json!({
-        "op": "advertise",
-        "channels": [
-            {
-                "id": 1,
-                "topic": "/pointcloud/mock",
+fn channel_to_foxglove_advertise(channel: &ChannelDescriptor) -> Value {
+    match channel.message_kind {
+        ChannelMessageKind::PointCloud => {
+            json!({
+                "id": channel.id,
+                "topic": channel.topic,
                 "encoding": "json",
                 "schemaName": "foxglove.PointCloud",
-                "schema": ""
-            }
-        ]
+                "schema": "",
+            })
+        }
+        ChannelMessageKind::Status => {
+            json!({
+                "id": channel.id,
+                "topic": channel.topic,
+                "encoding": "json",
+                "schemaName": "foxglove.RawMessage",
+                "schema": "",
+            })
+        }
+    }
+}
+
+pub fn foxglove_advertise_message(registry: &ChannelRegistry) -> String {
+    let channels = registry
+        .channels()
+        .iter()
+        .map(channel_to_foxglove_advertise)
+        .collect::<Vec<_>>();
+
+    json!({
+        "op": "advertise",
+        "channels": channels,
     })
     .to_string()
 }

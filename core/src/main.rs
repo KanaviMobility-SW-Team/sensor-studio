@@ -7,12 +7,14 @@ mod transport;
 mod types;
 
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
 use crate::engine::mock::MockEngine;
 use crate::instance::Instance;
 use crate::stream::StreamPublisher;
+use crate::stream::channel::ChannelRegistry;
 use crate::stream::websocket::{
     WebSocketMessage, WebSocketPublisher, WebSocketServer, WebSocketServerState,
 };
@@ -25,8 +27,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender, _) = broadcast::channel::<WebSocketMessage>(32);
 
+    let channel_registry = Arc::new(ChannelRegistry::mock_pointcloud());
+
     let ws_state = WebSocketServerState {
         sender: sender.clone(),
+        channel_registry,
     };
 
     tokio::spawn(async move {
