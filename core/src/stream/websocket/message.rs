@@ -4,7 +4,7 @@ use crate::types::PointCloudFrame;
 pub enum WebSocketMessage {
     Text(String),
     Frame {
-        source_id: &'static str,
+        source_id: String,
         frame: PointCloudFrame,
     },
 }

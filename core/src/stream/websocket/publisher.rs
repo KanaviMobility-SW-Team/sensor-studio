@@ -6,11 +6,11 @@ use crate::types::PointCloudFrame;
 
 pub struct WebSocketPublisher {
     sender: broadcast::Sender<WebSocketMessage>,
-    source_id: &'static str,
+    source_id: String,
 }
 
 impl WebSocketPublisher {
-    pub fn new(sender: broadcast::Sender<WebSocketMessage>, source_id: &'static str) -> Self {
+    pub fn new(sender: broadcast::Sender<WebSocketMessage>, source_id: String) -> Self {
         Self { sender, source_id }
     }
 }
@@ -18,7 +18,7 @@ impl WebSocketPublisher {
 impl StreamPublisher for WebSocketPublisher {
     fn publish(&mut self, frame: PointCloudFrame) {
         let _ = self.sender.send(WebSocketMessage::Frame {
-            source_id: self.source_id,
+            source_id: self.source_id.clone(),
             frame,
         });
     }
