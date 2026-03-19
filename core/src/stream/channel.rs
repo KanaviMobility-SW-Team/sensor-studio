@@ -1,4 +1,6 @@
-use crate::config::{ChannelEncoderConfig, ChannelSchemaConfig, InstanceChannelConfig};
+use crate::config::{
+    ChannelEncoderConfig, ChannelSchemaConfig, InstanceChannelConfig, InstanceRuntimeConfig,
+};
 
 #[derive(Clone, Debug)]
 pub struct ChannelDescriptor {
@@ -63,6 +65,32 @@ impl ChannelRegistry {
                 encoder: match config.encoder {
                     ChannelEncoderConfig::Json => ChannelEncoder::Json,
                 },
+            })
+            .collect();
+
+        Self::new(channels)
+    }
+
+    pub fn from_instance_configs(configs: &[InstanceRuntimeConfig]) -> Self {
+        let channels = configs
+            .iter()
+            .map(|config| {
+                let channel = &config.channel;
+
+                ChannelDescriptor {
+                    id: channel.channel_id,
+                    topic: channel.topic.clone(),
+                    source: ChannelSource {
+                        id: channel.source_id.clone(),
+                    },
+                    message_schema: match channel.schema {
+                        ChannelSchemaConfig::PointCloud => ChannelSchema::PointCloud,
+                        ChannelSchemaConfig::Status => ChannelSchema::Status,
+                    },
+                    encoder: match channel.encoder {
+                        ChannelEncoderConfig::Json => ChannelEncoder::Json,
+                    },
+                }
             })
             .collect();
 
