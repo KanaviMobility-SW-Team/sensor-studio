@@ -3,8 +3,20 @@ use std::net::{Ipv4Addr, SocketAddr};
 #[derive(Clone, Debug)]
 pub struct InstanceRuntimeConfig {
     pub instance_id: String,
+    pub engine: EngineRuntimeConfig,
     pub transport: TransportRuntimeConfig,
     pub channel: InstanceChannelConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct EngineRuntimeConfig {
+    pub kind: EngineKindConfig,
+    pub id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EngineKindConfig {
+    Mock,
 }
 
 #[derive(Clone, Debug)]

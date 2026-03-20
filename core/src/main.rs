@@ -12,8 +12,9 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::config::{
-    ChannelEncoderConfig, ChannelSchemaConfig, InstanceChannelConfig, InstanceRuntimeConfig,
-    TransportRuntimeConfig, UdpTransportRuntimeConfig,
+    ChannelEncoderConfig, ChannelSchemaConfig, EngineKindConfig, EngineRuntimeConfig,
+    InstanceChannelConfig, InstanceRuntimeConfig, TransportRuntimeConfig,
+    UdpTransportRuntimeConfig,
 };
 use crate::engine::mock::MockEngine;
 use crate::instance::Instance;
@@ -32,6 +33,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let instance_configs = vec![InstanceRuntimeConfig {
         instance_id: "instance-1".to_string(),
+        engine: EngineRuntimeConfig {
+            kind: EngineKindConfig::Mock,
+            id: "mock-engine".to_string(),
+        },
         transport: TransportRuntimeConfig::Udp(UdpTransportRuntimeConfig {
             bind_addr: "0.0.0.0:5000".parse()?,
             buffer_size: 4096,
@@ -68,7 +73,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let engine = Box::new(MockEngine::new("mock-engine"));
+    let engine = match &instance_config.engine.kind {
+        EngineKindConfig::Mock => Box::new(MockEngine::new(&instance_config.engine.id)),
+    };
+
     let mut instance = Instance::new(instance_config.instance_id.clone(), engine, transport);
 
     let mut publisher = WebSocketPublisher::new(sender.clone(), publish_source_id);
