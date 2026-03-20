@@ -1,0 +1,21 @@
+[[instances]]
+instance_id = "instance-1"
+
+[instances.engine]
+kind = "mock"
+id = "mock-engine"
+
+[instances.transport]
+type = "udp"
+bind_addr = "0.0.0.0:5000"
+buffer_size = 4096
+multicast_addr = "224.0.0.5"
+join_all_interfaces = true
+interface_addrs = []
+
+[instances.channel]
+channel_id = 1
+source_id = "mock_sensor"
+topic = "/pointcloud/mock"
+schema = "point_cloud"
+encoder = "json"

@@ -31,6 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender, _) = broadcast::channel::<WebSocketMessage>(32);
 
+    let config = config::loader::load_runtime_config("src/config/runtime.toml.example")?;
+    println!("{config:#?}");
+
     let instance_configs = vec![InstanceRuntimeConfig {
         instance_id: "instance-1".to_string(),
         engine: EngineRuntimeConfig {
