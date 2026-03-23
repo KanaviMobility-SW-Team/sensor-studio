@@ -27,8 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender, _) = broadcast::channel::<WebSocketMessage>(32);
 
-    let runtime_config = load_runtime_config("src/config/runtime.toml.example")?;
-    let instance_config: &&config::InstanceRuntimeConfig = &&runtime_config.instances[0];
+    let runtime_config = load_runtime_config("config/runtime.toml")?;
+    let instance_config = &runtime_config.instances[0];
 
     let publish_source_id = instance_config.channel.source_id.clone();
 
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut publisher = WebSocketPublisher::new(sender.clone(), publish_source_id);
 
     let ws_state = WebSocketServerState {
-        sender: sender,
+        sender,
         channel_registry,
     };
 
