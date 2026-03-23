@@ -11,3 +11,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Runtime configuration
+config/runtime.toml
