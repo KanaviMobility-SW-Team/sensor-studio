@@ -17,3 +17,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Private Engines
+sensor-studio-engines/

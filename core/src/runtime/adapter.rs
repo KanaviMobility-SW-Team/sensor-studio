@@ -69,8 +69,10 @@ impl FfiEngineAdapter {
             }
 
             let mut ffi_frame = unsafe { ffi_frame.assume_init() };
-            let frame = self.convert_frame(&ffi_frame)?;
-            frames.push(frame);
+            match self.convert_frame(&ffi_frame) {
+                Ok(frame) => frames.push(frame),
+                Err(error) => eprintln!("failed to convert ffi frame: {error}"),
+            }
 
             unsafe {
                 (self.library.free_frame)(&mut ffi_frame as *mut FfiPointCloudFrame);
@@ -149,7 +151,7 @@ impl FfiEngineAdapter {
             6 => PointFieldDataType::Uint32,
             7 => PointFieldDataType::Float32,
             8 => PointFieldDataType::Float64,
-            _ => PointFieldDataType::Uint8,
+            _ => PointFieldDataType::Unknown,
         }
     }
 }
@@ -163,7 +165,10 @@ impl Engine for FfiEngineAdapter {
     }
 
     fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
-        self.process_packet(&chunk).unwrap_or_default()
+        self.process_packet(&chunk).unwrap_or_else(|error| {
+            eprintln!("Error processing packet in FfiEngineAdapter: {error}");
+            Vec::new()
+        })
     }
 }
 

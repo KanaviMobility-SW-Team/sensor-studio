@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use bytes::Bytes;
 
 use crate::engine::Engine;
@@ -56,7 +58,10 @@ impl MockEngine {
     fn build_frame(&mut self, chunk_len: usize) -> PointCloudFrame {
         self.frame_counter += 1;
 
-        let timestamp_ns = self.frame_counter;
+        let timestamp_ns = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_nanos() as u64;
 
         let x: f32 = 1.0;
         let y: f32 = 2.0;
