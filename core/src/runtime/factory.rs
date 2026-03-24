@@ -1,4 +1,4 @@
-use crate::config::{EngineKindConfig, InstanceRuntimeConfig, TransportRuntimeConfig};
+use crate::config::{EngineRuntimeConfig, InstanceRuntimeConfig, TransportRuntimeConfig};
 use crate::engine::Engine;
 use crate::engine::mock::MockEngine;
 use crate::transport::udp::{UdpTransport, UdpTransportConfig};
@@ -6,8 +6,9 @@ use crate::transport::udp::{UdpTransport, UdpTransportConfig};
 pub fn build_engine(
     config: &InstanceRuntimeConfig,
 ) -> Result<Box<dyn Engine>, Box<dyn std::error::Error>> {
-    let engine: Box<dyn Engine> = match &config.engine.kind {
-        EngineKindConfig::Mock => Box::new(MockEngine::new(&config.engine.id)),
+    let engine: Box<dyn Engine> = match &config.engine {
+        EngineRuntimeConfig::Mock { id } => Box::new(MockEngine::new(id)),
+        EngineRuntimeConfig::External { .. } => todo!(),
     };
 
     Ok(engine)

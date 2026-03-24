@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, SocketAddr};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -15,15 +16,18 @@ pub struct InstanceRuntimeConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct EngineRuntimeConfig {
-    pub kind: EngineKindConfig,
-    pub id: String,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum EngineKindConfig {
-    Mock,
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum EngineRuntimeConfig {
+    Mock {
+        id: String,
+    },
+    External {
+        id: String,
+        library_path: String,
+        config_path: Option<String>,
+        #[serde(default)]
+        settings: BTreeMap<String, String>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -19,3 +19,31 @@ source_id = "mock_sensor"
 topic = "/pointcloud/mock"
 schema = "point_cloud"
 encoder = "json"
+
+[[instances]]
+instance_id = "instance-2"
+
+[instances.engine]
+kind = "external"
+id = "external-lidar-engine"
+library_path = "engines/libexternal_lidar_engine.so"
+config_path = "engines/external_lidar_engine.toml"
+
+[instances.engine.settings]
+profile = "default"
+model = "sample_lidar"
+
+[instances.transport]
+type = "udp"
+bind_addr = "0.0.0.0:5001"
+buffer_size = 4096
+multicast_addr = "224.0.0.5"
+join_all_interfaces = true
+interface_addrs = []
+
+[instances.channel]
+channel_id = 2
+source_id = "external_sensor"
+topic = "/pointcloud/external_sensor"
+schema = "point_cloud"
+encoder = "json"
