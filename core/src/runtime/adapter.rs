@@ -2,17 +2,20 @@ use std::ffi::{CStr, CString};
 
 use bytes::Bytes;
 
+use crate::engine::Engine;
 use crate::runtime::ffi::{EngineHandle, FFI_STATUS_OK, FfiPointCloudFrame};
 use crate::runtime::loader::ExternalEngineLibrary;
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
 
 pub struct FfiEngineAdapter {
+    id: String,
     library: ExternalEngineLibrary,
     handle: EngineHandle,
 }
 
 impl FfiEngineAdapter {
     pub unsafe fn new(
+        id: String,
         library: ExternalEngineLibrary,
         config_path: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
@@ -30,10 +33,14 @@ impl FfiEngineAdapter {
             return Err("failed to create external engine handle".into());
         }
 
-        Ok(Self { library, handle })
+        Ok(Self {
+            id,
+            library,
+            handle,
+        })
     }
 
-    pub fn process_packet(
+    fn process_packet(
         &mut self,
         packet: &Bytes,
     ) -> Result<Vec<PointCloudFrame>, Box<dyn std::error::Error>> {
@@ -144,6 +151,16 @@ impl FfiEngineAdapter {
             8 => PointFieldDataType::Float64,
             _ => PointFieldDataType::Uint8,
         }
+    }
+}
+
+impl Engine for FfiEngineAdapter {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
+        self.process_packet(&chunk).unwrap_or_default()
     }
 }
 
