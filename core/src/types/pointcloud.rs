@@ -17,6 +17,7 @@ pub enum PointFieldDataType {
     Uint32 = 6,
     Float32 = 7,
     Float64 = 8,
+    Unknown = 0,
 }
 
 #[derive(Clone, Debug)]

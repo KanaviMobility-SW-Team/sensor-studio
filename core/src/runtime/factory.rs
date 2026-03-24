@@ -1,13 +1,26 @@
-use crate::config::{EngineKindConfig, InstanceRuntimeConfig, TransportRuntimeConfig};
+use crate::config::{EngineRuntimeConfig, InstanceRuntimeConfig, TransportRuntimeConfig};
 use crate::engine::Engine;
 use crate::engine::mock::MockEngine;
+use crate::runtime::adapter::FfiEngineAdapter;
+use crate::runtime::loader::ExternalEngineLibrary;
 use crate::transport::udp::{UdpTransport, UdpTransportConfig};
 
 pub fn build_engine(
     config: &InstanceRuntimeConfig,
-) -> Result<Box<dyn Engine>, Box<dyn std::error::Error>> {
-    let engine: Box<dyn Engine> = match &config.engine.kind {
-        EngineKindConfig::Mock => Box::new(MockEngine::new(&config.engine.id)),
+) -> Result<Box<dyn Engine + Send>, Box<dyn std::error::Error>> {
+    let engine: Box<dyn Engine> = match &config.engine {
+        EngineRuntimeConfig::Mock { id } => Box::new(MockEngine::new(id)),
+        EngineRuntimeConfig::External {
+            id,
+            library_path,
+            config_path,
+            ..
+        } => {
+            let library = unsafe { ExternalEngineLibrary::load(library_path)? };
+            let adapter =
+                unsafe { FfiEngineAdapter::new(id.clone(), library, config_path.as_deref())? };
+            Box::new(adapter)
+        }
     };
 
     Ok(engine)

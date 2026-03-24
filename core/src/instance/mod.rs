@@ -18,7 +18,7 @@ pub enum InstanceState {
 pub struct Instance {
     pub id: InstanceId,
     pub state: InstanceState,
-    engine: Box<dyn Engine>,
+    engine: Box<dyn Engine + Send>,
     transport: UdpTransport,
 }
 

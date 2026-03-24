@@ -96,7 +96,8 @@ impl WebSocketServer {
                         }
                     }
                     WebSocketMessage::Frame { source_id, frame } => {
-                        let Some(channel) = channel_registry.get_by_source(source_id) else {
+                        let Some(channel) = channel_registry.get_by_source(source_id.as_str())
+                        else {
                             continue;
                         };
 

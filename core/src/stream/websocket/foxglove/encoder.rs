@@ -44,9 +44,10 @@ fn to_foxglove_numeric_type(datatype: PointFieldDataType) -> u8 {
         PointFieldDataType::Int8 => 2,
         PointFieldDataType::Uint16 => 3,
         PointFieldDataType::Int16 => 4,
-        PointFieldDataType::Uint32 => 5,
-        PointFieldDataType::Int32 => 6,
+        PointFieldDataType::Int32 => 5,
+        PointFieldDataType::Uint32 => 6,
         PointFieldDataType::Float32 => 7,
         PointFieldDataType::Float64 => 8,
+        _default => 0, // Unknown or unsupported types
     }
 }
