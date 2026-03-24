@@ -7,7 +7,7 @@ use crate::transport::udp::{UdpTransport, UdpTransportConfig};
 
 pub fn build_engine(
     config: &InstanceRuntimeConfig,
-) -> Result<Box<dyn Engine>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn Engine + Send>, Box<dyn std::error::Error>> {
     let engine: Box<dyn Engine> = match &config.engine {
         EngineRuntimeConfig::Mock { id } => Box::new(MockEngine::new(id)),
         EngineRuntimeConfig::External {

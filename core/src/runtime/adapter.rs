@@ -154,6 +154,9 @@ impl FfiEngineAdapter {
     }
 }
 
+// FfiEngineAdapter가 스레드 간에 이동해도 안전함을 컴파일러에게 강제로 알려줍니다.
+unsafe impl Send for FfiEngineAdapter {}
+
 impl Engine for FfiEngineAdapter {
     fn id(&self) -> &str {
         &self.id

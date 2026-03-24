@@ -28,23 +28,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (sender, _) = broadcast::channel::<WebSocketMessage>(32);
 
     let runtime_config = load_runtime_config("config/runtime.toml")?;
-    let instance_config = &runtime_config.instances[0];
 
-    let publish_source_id = instance_config.channel.source_id.clone();
+    if runtime_config.instances.is_empty() {
+        return Err("runtime config must contain at least one instance".into());
+    }
 
     let channel_registry = Arc::new(ChannelRegistry::from_instance_configs(
         &runtime_config.instances,
     ));
 
-    let transport = build_udp_transport(instance_config).await?;
-    let engine = build_engine(instance_config)?;
-
-    let mut instance = Instance::new(instance_config.instance_id.clone(), engine, transport);
-
-    let mut publisher = WebSocketPublisher::new(sender.clone(), publish_source_id);
-
     let ws_state = WebSocketServerState {
-        sender,
+        sender: sender.clone(),
         channel_registry,
     };
 
@@ -54,16 +48,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    println!("Waiting for one UDP datagram...");
     println!("WebSocket server listening on {}", ws_bind_addr);
 
-    loop {
-        let frames = instance.run_once().await?;
+    for instance_config in runtime_config.instances {
+        let sender = sender.clone();
+        tokio::spawn(async move {
+            let publish_source_id = instance_config.channel.source_id.clone();
 
-        for frame in frames {
-            publisher.publish(frame);
-        }
+            let transport = match build_udp_transport(&instance_config).await {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!(
+                        "transport setup failed for instance '{}': {error}",
+                        instance_config.instance_id
+                    );
+                    return;
+                }
+            };
+
+            let engine = match build_engine(&instance_config) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!(
+                        "engine setup failed for instance '{}': {error}",
+                        instance_config.instance_id
+                    );
+                    return;
+                }
+            };
+
+            let mut instance =
+                Instance::new(instance_config.instance_id.clone(), engine, transport);
+
+            let mut publisher = WebSocketPublisher::new(sender, publish_source_id);
+
+            println!("instance '{}' started", instance_config.instance_id);
+
+            loop {
+                match instance.run_once().await {
+                    Ok(frames) => {
+                        for frame in frames {
+                            publisher.publish(frame);
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "runtime loop failed for instance '{}': {error}",
+                            instance_config.instance_id
+                        );
+                        break;
+                    }
+                }
+            }
+        });
     }
 
+    tokio::signal::ctrl_c().await?;
     Ok(())
 }
