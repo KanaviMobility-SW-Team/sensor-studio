@@ -1,5 +1,9 @@
 use std::ffi::{c_char, c_int, c_uchar, c_ulonglong, c_void};
 
+pub const FFI_STATUS_OK: c_int = 0;
+pub const FFI_STATUS_NO_FRAME: c_int = 1;
+pub const FFI_STATUS_ERROR: c_int = -1;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct FfiPointField {
