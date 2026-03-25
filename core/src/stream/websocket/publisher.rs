@@ -17,7 +17,7 @@ impl WebSocketPublisher {
 
 impl StreamPublisher for WebSocketPublisher {
     fn publish(&mut self, frame: PointCloudFrame) {
-        let _ = self.sender.send(WebSocketMessage::Frame {
+        let _ = self.sender.send(WebSocketMessage {
             source_id: self.source_id.clone(),
             frame,
         });

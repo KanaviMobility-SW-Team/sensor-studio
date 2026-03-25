@@ -4,19 +4,19 @@ use bytes::Bytes;
 
 use crate::engine::Engine;
 use crate::runtime::ffi::{EngineHandle, FFI_STATUS_OK, FfiPointCloudFrame};
-use crate::runtime::loader::ExternalEngineLibrary;
+use crate::runtime::loader::EngineLibrary;
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
 
 pub struct FfiEngineAdapter {
     id: String,
-    library: ExternalEngineLibrary,
+    library: EngineLibrary,
     handle: EngineHandle,
 }
 
 impl FfiEngineAdapter {
     pub unsafe fn new(
         id: String,
-        library: ExternalEngineLibrary,
+        library: EngineLibrary,
         config_path: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let config_cstring = match config_path {
@@ -30,7 +30,7 @@ impl FfiEngineAdapter {
 
         let handle = (library.create)(config_ptr);
         if handle.is_null() {
-            return Err("failed to create external engine handle".into());
+            return Err("failed to create engine handle".into());
         }
 
         Ok(Self {
@@ -48,7 +48,7 @@ impl FfiEngineAdapter {
             unsafe { (self.library.process_packet)(self.handle, packet.as_ptr(), packet.len()) };
 
         if status != FFI_STATUS_OK {
-            return Err(format!("external engine process_packet failed: {status}").into());
+            return Err(format!("engine process_packet failed: {status}").into());
         }
 
         let mut frames = Vec::new();
@@ -65,7 +65,7 @@ impl FfiEngineAdapter {
                 unsafe { (self.library.pop_frame)(self.handle, ffi_frame.as_mut_ptr()) };
 
             if pop_status != FFI_STATUS_OK {
-                return Err(format!("external engine pop_frame failed: {pop_status}").into());
+                return Err(format!("engine pop_frame failed: {pop_status}").into());
             }
 
             let mut ffi_frame = unsafe { ffi_frame.assume_init() };

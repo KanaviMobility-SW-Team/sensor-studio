@@ -5,7 +5,7 @@ use crate::runtime::ffi::{
     EngineProcessPacketFn,
 };
 
-pub struct ExternalEngineLibrary {
+pub struct EngineLibrary {
     _library: Library,
     pub create: EngineCreateFn,
     pub destroy: EngineDestroyFn,
@@ -15,7 +15,7 @@ pub struct ExternalEngineLibrary {
     pub free_frame: EngineFreeFrameFn,
 }
 
-impl ExternalEngineLibrary {
+impl EngineLibrary {
     pub unsafe fn load(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let library = Library::new(path)?;
 

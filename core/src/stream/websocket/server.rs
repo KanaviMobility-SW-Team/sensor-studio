@@ -88,35 +88,24 @@ impl WebSocketServer {
 
         let mut rx = receiver;
         let send_task = tokio::spawn(async move {
-            while let Ok(message) = rx.recv().await {
-                match message {
-                    WebSocketMessage::Text(text) => {
-                        if sender.send(Message::Text(text.into())).await.is_err() {
-                            break;
-                        }
+            while let Ok(WebSocketMessage { source_id, frame }) = rx.recv().await {
+                let Some(channel) = channel_registry.get_by_source(source_id.as_str()) else {
+                    continue;
+                };
+
+                let subscriptions = send_subscriptions.lock().await;
+
+                for (subscription_id, channel_id) in subscriptions.iter() {
+                    if *channel_id != channel.id {
+                        continue;
                     }
-                    WebSocketMessage::Frame { source_id, frame } => {
-                        let Some(channel) = channel_registry.get_by_source(source_id.as_str())
-                        else {
-                            continue;
-                        };
 
-                        let subscriptions = send_subscriptions.lock().await;
+                    let timestamp_ns = frame.timestamp_ns;
+                    let payload = encode_point_cloud_payload(&frame);
+                    let binary = make_message_data_frame(*subscription_id, timestamp_ns, &payload);
 
-                        for (subscription_id, channel_id) in subscriptions.iter() {
-                            if *channel_id != channel.id {
-                                continue;
-                            }
-
-                            let timestamp_ns = frame.timestamp_ns;
-                            let payload = encode_point_cloud_payload(&frame);
-                            let binary =
-                                make_message_data_frame(*subscription_id, timestamp_ns, &payload);
-
-                            if sender.send(Message::Binary(binary.into())).await.is_err() {
-                                return;
-                            }
-                        }
+                    if sender.send(Message::Binary(binary.into())).await.is_err() {
+                        return;
                     }
                 }
             }
