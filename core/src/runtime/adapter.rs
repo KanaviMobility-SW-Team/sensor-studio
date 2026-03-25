@@ -3,9 +3,19 @@ use std::ffi::{CStr, CString};
 use bytes::Bytes;
 
 use crate::engine::Engine;
-use crate::runtime::ffi::{EngineHandle, FFI_STATUS_OK, FfiPointCloudFrame};
+use crate::runtime::ffi::{
+    EngineHandle, FFI_STATUS_OK, FfiApiBuffer, FfiApiInfo, FfiPointCloudFrame,
+};
 use crate::runtime::loader::EngineLibrary;
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
+
+#[derive(Debug, Clone)]
+pub struct EngineExtensionApiInfo {
+    pub name: String,
+    pub description: String,
+    pub input_schema_json: String,
+    pub output_schema_json: String,
+}
 
 pub struct FfiEngineAdapter {
     id: String,
@@ -153,6 +163,87 @@ impl FfiEngineAdapter {
             8 => PointFieldDataType::Float64,
             _ => PointFieldDataType::Unknown,
         }
+    }
+
+    fn read_c_string(ptr: *const std::ffi::c_char) -> Result<String, Box<dyn std::error::Error>> {
+        if ptr.is_null() {
+            return Ok(String::new());
+        }
+
+        Ok(unsafe { CStr::from_ptr(ptr) }.to_str()?.to_string())
+    }
+
+    fn read_api_buffer(&self, buffer: &FfiApiBuffer) -> Result<String, Box<dyn std::error::Error>> {
+        if buffer.data_ptr.is_null() || buffer.data_len == 0 {
+            return Ok(String::new());
+        }
+
+        let bytes = unsafe { std::slice::from_raw_parts(buffer.data_ptr, buffer.data_len) };
+
+        Ok(std::str::from_utf8(bytes)?.to_string())
+    }
+
+    pub fn list_extension_apis(
+        &self,
+    ) -> Result<Vec<EngineExtensionApiInfo>, Box<dyn std::error::Error>> {
+        let count = unsafe { (self.library.get_api_count)(self.handle) };
+
+        let mut apis = Vec::with_capacity(count);
+
+        for index in 0..count {
+            let mut ffi_info = std::mem::MaybeUninit::<FfiApiInfo>::uninit();
+
+            let status =
+                unsafe { (self.library.get_api_info)(self.handle, index, ffi_info.as_mut_ptr()) };
+
+            if status != FFI_STATUS_OK {
+                return Err(format!("failed to get api info at index {index}: {status}").into());
+            }
+
+            let ffi_info = unsafe { ffi_info.assume_init() };
+
+            apis.push(EngineExtensionApiInfo {
+                name: Self::read_c_string(ffi_info.name_ptr)?,
+                description: Self::read_c_string(ffi_info.description_ptr)?,
+                input_schema_json: Self::read_c_string(ffi_info.input_schema_json_ptr)?,
+                output_schema_json: Self::read_c_string(ffi_info.output_schema_json_ptr)?,
+            });
+        }
+
+        Ok(apis)
+    }
+
+    pub fn call_extension_api(
+        &self,
+        api_name: &str,
+        input_json: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let api_name = CString::new(api_name)?;
+        let input_json = CString::new(input_json)?;
+
+        let mut buffer = std::mem::MaybeUninit::<FfiApiBuffer>::uninit();
+
+        let status = unsafe {
+            (self.library.call_api)(
+                self.handle,
+                api_name.as_ptr(),
+                input_json.as_ptr(),
+                buffer.as_mut_ptr(),
+            )
+        };
+
+        if status != FFI_STATUS_OK {
+            return Err(format!("failed to call extension api: {status}").into());
+        }
+
+        let mut buffer = unsafe { buffer.assume_init() };
+        let output = self.read_api_buffer(&buffer)?;
+
+        unsafe {
+            (self.library.free_api_buffer)(&mut buffer as *mut FfiApiBuffer);
+        }
+
+        Ok(output)
     }
 }
 
