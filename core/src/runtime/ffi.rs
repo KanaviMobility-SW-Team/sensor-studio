@@ -29,6 +29,22 @@ pub struct FfiPointCloudFrame {
     pub data_len: usize,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct FfiApiInfo {
+    pub name_ptr: *const c_char,
+    pub description_ptr: *const c_char,
+    pub input_schema_json_ptr: *const c_char,
+    pub output_schema_json_ptr: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct FfiApiBuffer {
+    pub data_ptr: *const c_uchar,
+    pub data_len: usize,
+}
+
 pub type EngineHandle = *mut c_void;
 
 pub type EngineCreateFn = unsafe extern "C" fn(config_path: *const c_char) -> EngineHandle;
@@ -44,3 +60,17 @@ pub type EnginePopFrameFn =
     unsafe extern "C" fn(handle: EngineHandle, out_frame: *mut FfiPointCloudFrame) -> c_int;
 
 pub type EngineFreeFrameFn = unsafe extern "C" fn(frame: *mut FfiPointCloudFrame);
+
+pub type EngineGetApiCountFn = unsafe extern "C" fn(handle: EngineHandle) -> usize;
+
+pub type EngineGetApiInfoFn =
+    unsafe extern "C" fn(handle: EngineHandle, index: usize, out_info: *mut FfiApiInfo) -> c_int;
+
+pub type EngineCallApiFn = unsafe extern "C" fn(
+    handle: EngineHandle,
+    api_name_ptr: *const c_char,
+    input_json_ptr: *const c_char,
+    out_buffer: *mut FfiApiBuffer,
+) -> c_int;
+
+pub type EngineFreeApiBufferFn = unsafe extern "C" fn(buffer: *mut FfiApiBuffer);
