@@ -8,6 +8,8 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
+use serde_json::Value;
 use tokio::sync::{Mutex, broadcast};
 
 use crate::runtime::extensions::EngineExtensionRegistry;
@@ -17,6 +19,14 @@ use crate::stream::websocket::foxglove::{
     FOXGLOVE_SUBPROTOCOL, FoxgloveClientCommand, FoxgloveClientMessage, encode_point_cloud_payload,
     foxglove_advertise_message, foxglove_server_info_message, make_message_data_frame,
 };
+use crate::stream::websocket::protocol::{
+    ClientControlMessage, EngineExtensionApiInfoDto, ServerControlMessage,
+};
+
+#[derive(Debug, Deserialize)]
+struct MessageOpEnvelope {
+    op: String,
+}
 
 #[derive(Clone)]
 pub struct WebSocketServerState {
@@ -54,6 +64,7 @@ impl WebSocketServer {
                     socket,
                     state.sender.subscribe(),
                     state.channel_registry.clone(),
+                    state.extension_registry.clone(),
                 )
             })
     }
@@ -62,6 +73,7 @@ impl WebSocketServer {
         socket: WebSocket,
         receiver: broadcast::Receiver<WebSocketMessage>,
         channel_registry: Arc<ChannelRegistry>,
+        extension_registry: EngineExtensionRegistry,
     ) {
         let (mut sender, mut incoming) = socket.split();
 
@@ -83,12 +95,23 @@ impl WebSocketServer {
             return;
         }
 
+        let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
+
+        tokio::spawn(async move {
+            while let Some(message) = out_rx.recv().await {
+                if sender.send(message).await.is_err() {
+                    break;
+                }
+            }
+        });
+
         let subscriptions = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
 
         let send_subscriptions = Arc::clone(&subscriptions);
         let recv_subscriptions = Arc::clone(&subscriptions);
 
         let mut rx = receiver;
+        let out_tx_clone = out_tx.clone();
         let send_task = tokio::spawn(async move {
             while let Ok(WebSocketMessage { source_id, frame }) = rx.recv().await {
                 let Some(channel) = channel_registry.get_by_source(source_id.as_str()) else {
@@ -106,41 +129,62 @@ impl WebSocketServer {
                     let payload = encode_point_cloud_payload(&frame);
                     let binary = make_message_data_frame(*subscription_id, timestamp_ns, &payload);
 
-                    if sender.send(Message::Binary(binary.into())).await.is_err() {
-                        return;
-                    }
+                    let _ = out_tx_clone.send(Message::Binary(binary.into()));
                 }
             }
         });
 
+        let out_tx_clone = out_tx.clone();
         let recv_task = tokio::spawn(async move {
             while let Some(Ok(message)) = incoming.next().await {
                 match message {
                     Message::Text(text) => {
-                        if let Ok(client_message) =
-                            serde_json::from_str::<FoxgloveClientMessage>(&text)
-                        {
-                            let commands = client_message.into_commands();
-                            let mut subscriptions = recv_subscriptions.lock().await;
+                        if let Ok(envelope) = serde_json::from_str::<MessageOpEnvelope>(&text) {
+                            match envelope.op.as_str() {
+                                "subscribe" | "unsubscribe" => {
+                                    if let Ok(client_message) =
+                                        serde_json::from_str::<FoxgloveClientMessage>(&text)
+                                    {
+                                        let commands = client_message.into_commands();
+                                        let mut subscriptions = recv_subscriptions.lock().await;
 
-                            for command in commands {
-                                match command {
-                                    FoxgloveClientCommand::Subscribe {
-                                        subscription_id,
-                                        channel_id,
-                                    } => {
-                                        subscriptions.insert(subscription_id, channel_id);
-                                        println!(
-                                            "subscribe: subscription_id={}, channel_id={}",
-                                            subscription_id, channel_id
-                                        );
+                                        for command in commands {
+                                            match command {
+                                                FoxgloveClientCommand::Subscribe {
+                                                    subscription_id,
+                                                    channel_id,
+                                                } => {
+                                                    subscriptions
+                                                        .insert(subscription_id, channel_id);
+                                                    println!(
+                                                        "subscribe: subscription_id={}, channel_id={}",
+                                                        subscription_id, channel_id
+                                                    );
+                                                }
+                                                FoxgloveClientCommand::Unsubscribe {
+                                                    subscription_id,
+                                                } => {
+                                                    subscriptions.remove(&subscription_id);
+                                                    println!(
+                                                        "unsubscribe: subscription_id={}",
+                                                        subscription_id
+                                                    );
+                                                }
+                                            }
+                                        }
                                     }
-                                    FoxgloveClientCommand::Unsubscribe { subscription_id } => {
-                                        subscriptions.remove(&subscription_id);
-                                        println!(
-                                            "unsubscribe: subscription_id={}",
-                                            subscription_id
-                                        );
+                                }
+                                _ => {
+                                    if let Some(response) =
+                                        Self::handle_control_message(&text, &extension_registry)
+                                            .await
+                                    {
+                                        if out_tx_clone
+                                            .send(Message::Text(response.into()))
+                                            .is_err()
+                                        {
+                                            return;
+                                        }
                                     }
                                 }
                             }
@@ -153,5 +197,117 @@ impl WebSocketServer {
         });
 
         let _ = tokio::join!(send_task, recv_task);
+    }
+
+    async fn handle_control_message(
+        text: &str,
+        extension_registry: &EngineExtensionRegistry,
+    ) -> Option<String> {
+        let request = match serde_json::from_str::<ClientControlMessage>(text) {
+            Ok(value) => value,
+            Err(error) => {
+                let response = ServerControlMessage::EngineApiError {
+                    instance_id: String::new(),
+                    api_name: None,
+                    message: format!("invalid control message: {error}"),
+                };
+                return serde_json::to_string(&response).ok();
+            }
+        };
+
+        match request {
+            ClientControlMessage::GetEngineApis { instance_id } => {
+                let Some(shared) = extension_registry.get(&instance_id) else {
+                    let response = ServerControlMessage::EngineApiError {
+                        instance_id,
+                        api_name: None,
+                        message: "instance not found".to_string(),
+                    };
+                    return serde_json::to_string(&response).ok();
+                };
+
+                let result = match shared.lock() {
+                    Ok(adapter) => adapter.list_extension_apis(),
+                    Err(error) => Err(format!("failed to lock engine adapter: {error}").into()),
+                };
+
+                match result {
+                    Ok(apis) => {
+                        let response = ServerControlMessage::EngineApis {
+                            instance_id,
+                            apis: apis
+                                .into_iter()
+                                .map(EngineExtensionApiInfoDto::from)
+                                .collect(),
+                        };
+                        serde_json::to_string(&response).ok()
+                    }
+                    Err(error) => {
+                        let response = ServerControlMessage::EngineApiError {
+                            instance_id,
+                            api_name: None,
+                            message: error.to_string(),
+                        };
+                        serde_json::to_string(&response).ok()
+                    }
+                }
+            }
+
+            ClientControlMessage::CallEngineApi {
+                instance_id,
+                api_name,
+                input,
+            } => {
+                let Some(shared) = extension_registry.get(&instance_id) else {
+                    let response = ServerControlMessage::EngineApiError {
+                        instance_id,
+                        api_name: Some(api_name),
+                        message: "instance not found".to_string(),
+                    };
+                    return serde_json::to_string(&response).ok();
+                };
+
+                let input_json = match serde_json::to_string(&input) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        let response = ServerControlMessage::EngineApiError {
+                            instance_id,
+                            api_name: Some(api_name),
+                            message: format!("failed to serialize input: {error}"),
+                        };
+                        return serde_json::to_string(&response).ok();
+                    }
+                };
+
+                let result = match shared.lock() {
+                    Ok(adapter) => adapter.call_extension_api(&api_name, &input_json),
+                    Err(error) => Err(format!("failed to lock engine adapter: {error}").into()),
+                };
+
+                match result {
+                    Ok(output_json) => {
+                        let output = match serde_json::from_str::<Value>(&output_json) {
+                            Ok(value) => value,
+                            Err(_) => Value::String(output_json),
+                        };
+
+                        let response = ServerControlMessage::EngineApiResult {
+                            instance_id,
+                            api_name,
+                            output,
+                        };
+                        serde_json::to_string(&response).ok()
+                    }
+                    Err(error) => {
+                        let response = ServerControlMessage::EngineApiError {
+                            instance_id,
+                            api_name: Some(api_name),
+                            message: error.to_string(),
+                        };
+                        serde_json::to_string(&response).ok()
+                    }
+                }
+            }
+        }
     }
 }
