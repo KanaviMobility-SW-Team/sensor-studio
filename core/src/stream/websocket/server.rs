@@ -10,6 +10,7 @@ use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{Mutex, broadcast};
 
+use crate::runtime::extensions::EngineExtensionRegistry;
 use crate::stream::channel::ChannelRegistry;
 use crate::stream::websocket::WebSocketMessage;
 use crate::stream::websocket::foxglove::{
@@ -21,6 +22,7 @@ use crate::stream::websocket::foxglove::{
 pub struct WebSocketServerState {
     pub sender: broadcast::Sender<WebSocketMessage>,
     pub channel_registry: Arc<ChannelRegistry>,
+    pub extension_registry: EngineExtensionRegistry,
 }
 
 pub struct WebSocketServer;

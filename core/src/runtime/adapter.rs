@@ -1,4 +1,5 @@
 use std::ffi::{CStr, CString};
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 
@@ -267,6 +268,34 @@ impl Drop for FfiEngineAdapter {
     fn drop(&mut self) {
         unsafe {
             (self.library.destroy)(self.handle);
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SharedFfiEngineAdapter {
+    inner: Arc<Mutex<FfiEngineAdapter>>,
+    id: String,
+}
+
+impl SharedFfiEngineAdapter {
+    pub fn new(id: String, inner: Arc<Mutex<FfiEngineAdapter>>) -> Self {
+        Self { inner, id }
+    }
+}
+
+impl Engine for SharedFfiEngineAdapter {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
+        match self.inner.lock() {
+            Ok(mut adapter) => adapter.process(chunk),
+            Err(error) => {
+                eprintln!("failed to lock ffi engine adapter: {error}");
+                Vec::new()
+            }
         }
     }
 }

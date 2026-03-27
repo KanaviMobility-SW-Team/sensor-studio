@@ -1,12 +1,15 @@
+use std::sync::{Arc, Mutex};
+
 use crate::config::{InstanceRuntimeConfig, TransportRuntimeConfig};
 use crate::engine::Engine;
-use crate::runtime::adapter::FfiEngineAdapter;
+use crate::runtime::adapter::{FfiEngineAdapter, SharedFfiEngineAdapter};
+use crate::runtime::extensions::SharedEngineExtension;
 use crate::runtime::loader::EngineLibrary;
 use crate::transport::udp::{UdpTransport, UdpTransportConfig};
 
-pub fn build_engine(
+pub fn build_engine_extension_adapter(
     config: &InstanceRuntimeConfig,
-) -> Result<Box<dyn Engine + Send>, Box<dyn std::error::Error>> {
+) -> Result<SharedEngineExtension, Box<dyn std::error::Error>> {
     let engine_config = &config.engine;
     let library = unsafe { EngineLibrary::load(&engine_config.library_path)? };
     let adapter = unsafe {
@@ -17,7 +20,17 @@ pub fn build_engine(
         )?
     };
 
-    Ok(Box::new(adapter))
+    Ok(Arc::new(Mutex::new(adapter)))
+}
+
+pub fn build_shared_engine(
+    config: &InstanceRuntimeConfig,
+    shared: SharedEngineExtension,
+) -> Result<Box<dyn Engine + Send>, Box<dyn std::error::Error>> {
+    Ok(Box::new(SharedFfiEngineAdapter::new(
+        config.engine.id.clone(),
+        shared,
+    )))
 }
 
 pub async fn build_udp_transport(
