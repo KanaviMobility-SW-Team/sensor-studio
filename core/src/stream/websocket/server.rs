@@ -113,23 +113,36 @@ impl WebSocketServer {
         let mut rx = receiver;
         let out_tx_clone = out_tx.clone();
         let send_task = tokio::spawn(async move {
-            while let Ok(WebSocketMessage { source_id, frame }) = rx.recv().await {
-                let Some(channel) = channel_registry.get_by_source(source_id.as_str()) else {
-                    continue;
-                };
+            loop {
+                match rx.recv().await {
+                    Ok(WebSocketMessage { source_id, frame }) => {
+                        let Some(channel) = channel_registry.get_by_source(source_id.as_str())
+                        else {
+                            continue;
+                        };
 
-                let subscriptions = send_subscriptions.lock().await;
+                        let subscriptions = send_subscriptions.lock().await;
 
-                for (subscription_id, channel_id) in subscriptions.iter() {
-                    if *channel_id != channel.id {
+                        for (subscription_id, channel_id) in subscriptions.iter() {
+                            if *channel_id != channel.id {
+                                continue;
+                            }
+
+                            let timestamp_ns = frame.timestamp_ns;
+                            let payload = encode_point_cloud_payload(&frame);
+                            let binary =
+                                make_message_data_frame(*subscription_id, timestamp_ns, &payload);
+
+                            let _ = out_tx_clone.send(Message::Binary(binary.into()));
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(count)) => {
+                        eprintln!("websocket client lagged, skipped {count} messages");
                         continue;
                     }
-
-                    let timestamp_ns = frame.timestamp_ns;
-                    let payload = encode_point_cloud_payload(&frame);
-                    let binary = make_message_data_frame(*subscription_id, timestamp_ns, &payload);
-
-                    let _ = out_tx_clone.send(Message::Binary(binary.into()));
+                    Err(broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
                 }
             }
         });
