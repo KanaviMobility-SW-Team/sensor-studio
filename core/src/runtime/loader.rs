@@ -1,11 +1,12 @@
-use libloading::{Library, Symbol};
+use libloading::Library;
 
 use crate::runtime::ffi::{
-    EngineCreateFn, EngineDestroyFn, EngineFreeFrameFn, EngineHasFrameFn, EnginePopFrameFn,
+    EngineCallApiFn, EngineCreateFn, EngineDestroyFn, EngineFreeApiBufferFn, EngineFreeFrameFn,
+    EngineGetApiCountFn, EngineGetApiInfoFn, EngineHasFrameFn, EnginePopFrameFn,
     EngineProcessPacketFn,
 };
 
-pub struct ExternalEngineLibrary {
+pub struct EngineLibrary {
     _library: Library,
     pub create: EngineCreateFn,
     pub destroy: EngineDestroyFn,
@@ -13,9 +14,13 @@ pub struct ExternalEngineLibrary {
     pub has_frame: EngineHasFrameFn,
     pub pop_frame: EnginePopFrameFn,
     pub free_frame: EngineFreeFrameFn,
+    pub get_api_count: EngineGetApiCountFn,
+    pub get_api_info: EngineGetApiInfoFn,
+    pub call_api: EngineCallApiFn,
+    pub free_api_buffer: EngineFreeApiBufferFn,
 }
 
-impl ExternalEngineLibrary {
+impl EngineLibrary {
     pub unsafe fn load(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let library = Library::new(path)?;
 
@@ -26,6 +31,11 @@ impl ExternalEngineLibrary {
         let pop_frame = *library.get::<EnginePopFrameFn>(b"engine_pop_frame")?;
         let free_frame = *library.get::<EngineFreeFrameFn>(b"engine_free_frame")?;
 
+        let get_api_count = *library.get::<EngineGetApiCountFn>(b"engine_get_api_count")?;
+        let get_api_info = *library.get::<EngineGetApiInfoFn>(b"engine_get_api_info")?;
+        let call_api = *library.get::<EngineCallApiFn>(b"engine_call_api")?;
+        let free_api_buffer = *library.get::<EngineFreeApiBufferFn>(b"engine_free_api_buffer")?;
+
         Ok(Self {
             _library: library,
             create,
@@ -34,6 +44,10 @@ impl ExternalEngineLibrary {
             has_frame,
             pop_frame,
             free_frame,
+            get_api_count,
+            get_api_info,
+            call_api,
+            free_api_buffer,
         })
     }
 }

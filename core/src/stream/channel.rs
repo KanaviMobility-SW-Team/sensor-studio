@@ -1,6 +1,4 @@
-use crate::config::{
-    ChannelEncoderConfig, ChannelSchemaConfig, InstanceChannelConfig, InstanceRuntimeConfig,
-};
+use crate::config::{ChannelEncoderConfig, ChannelSchemaConfig, InstanceRuntimeConfig};
 
 #[derive(Clone, Debug)]
 pub struct ChannelDescriptor {
@@ -35,40 +33,6 @@ pub struct ChannelRegistry {
 impl ChannelRegistry {
     pub fn new(channels: Vec<ChannelDescriptor>) -> Self {
         Self { channels }
-    }
-
-    pub fn mock_pointcloud() -> Self {
-        Self::new(vec![ChannelDescriptor {
-            id: 1,
-            topic: "/pointcloud/mock".to_string(),
-            source: ChannelSource {
-                id: "mock_sensor".to_string(),
-            },
-            message_schema: ChannelSchema::PointCloud,
-            encoder: ChannelEncoder::Json,
-        }])
-    }
-
-    pub fn from_configs(configs: &[InstanceChannelConfig]) -> Self {
-        let channels = configs
-            .iter()
-            .map(|config| ChannelDescriptor {
-                id: config.channel_id,
-                topic: config.topic.clone(),
-                source: ChannelSource {
-                    id: config.source_id.clone(),
-                },
-                message_schema: match config.schema {
-                    ChannelSchemaConfig::PointCloud => ChannelSchema::PointCloud,
-                    ChannelSchemaConfig::Status => ChannelSchema::Status,
-                },
-                encoder: match config.encoder {
-                    ChannelEncoderConfig::Json => ChannelEncoder::Json,
-                },
-            })
-            .collect();
-
-        Self::new(channels)
     }
 
     pub fn from_instance_configs(configs: &[InstanceRuntimeConfig]) -> Self {

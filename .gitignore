@@ -20,3 +20,9 @@ Thumbs.db
 
 # Private Engines
 sensor-studio-engines/
+
+# Ignore everything in core/config/
+core/config/*
+
+# Except the example config file
+!core/config/runtime.toml.example

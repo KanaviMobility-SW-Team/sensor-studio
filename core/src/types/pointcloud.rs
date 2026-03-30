@@ -34,6 +34,7 @@ pub struct PointCloudFrame {
 }
 
 impl PointCloudFrame {
+    #[allow(dead_code)]
     pub fn new(
         timestamp_ns: u64,
         frame_id: impl Into<String>,
@@ -57,9 +58,5 @@ impl PointCloudFrame {
             is_dense,
             data,
         }
-    }
-
-    pub fn point_count(&self) -> u32 {
-        self.width.saturating_mul(self.height)
     }
 }

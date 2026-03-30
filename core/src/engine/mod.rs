@@ -1,5 +1,3 @@
-pub mod mock;
-
 use bytes::Bytes;
 
 use crate::types::PointCloudFrame;

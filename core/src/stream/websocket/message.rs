@@ -1,10 +1,7 @@
 use crate::types::PointCloudFrame;
 
 #[derive(Clone, Debug)]
-pub enum WebSocketMessage {
-    Text(String),
-    Frame {
-        source_id: String,
-        frame: PointCloudFrame,
-    },
+pub struct WebSocketMessage {
+    pub source_id: String,
+    pub frame: PointCloudFrame,
 }

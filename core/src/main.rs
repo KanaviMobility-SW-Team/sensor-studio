@@ -7,6 +7,7 @@ mod stream;
 mod transport;
 mod types;
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -14,7 +15,10 @@ use tokio::sync::broadcast;
 
 use crate::config::loader::load_runtime_config;
 use crate::instance::Instance;
-use crate::runtime::factory::{build_engine, build_udp_transport};
+use crate::runtime::extensions::EngineExtensionRegistry;
+use crate::runtime::factory::{
+    build_engine_extension_adapter, build_shared_engine, build_udp_transport,
+};
 use crate::stream::StreamPublisher;
 use crate::stream::channel::ChannelRegistry;
 use crate::stream::websocket::{
@@ -37,9 +41,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &runtime_config.instances,
     ));
 
+    let mut extension_entries = HashMap::new();
+
+    for instance_config in &runtime_config.instances {
+        let shared = build_engine_extension_adapter(instance_config)?;
+        extension_entries.insert(instance_config.instance_id.clone(), shared);
+    }
+
+    let extension_registry = EngineExtensionRegistry::new(extension_entries);
+
     let ws_state = WebSocketServerState {
         sender: sender.clone(),
         channel_registry,
+        extension_registry: extension_registry.clone(),
     };
 
     tokio::spawn(async move {
@@ -52,8 +66,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for instance_config in runtime_config.instances {
         let sender = sender.clone();
+        let extension_registry = extension_registry.clone();
+
         tokio::spawn(async move {
             let publish_source_id = instance_config.channel.source_id.clone();
+
+            let shared = match extension_registry.get(&instance_config.instance_id) {
+                Some(value) => value,
+                None => {
+                    eprintln!(
+                        "engine extension adapter not found for instance '{}'",
+                        instance_config.instance_id
+                    );
+                    return;
+                }
+            };
 
             let transport = match build_udp_transport(&instance_config).await {
                 Ok(value) => value,
@@ -66,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let engine = match build_engine(&instance_config) {
+            let engine = match build_shared_engine(&instance_config, shared) {
                 Ok(value) => value,
                 Err(error) => {
                     eprintln!(

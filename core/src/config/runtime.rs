@@ -16,18 +16,12 @@ pub struct InstanceRuntimeConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum EngineRuntimeConfig {
-    Mock {
-        id: String,
-    },
-    External {
-        id: String,
-        library_path: String,
-        config_path: Option<String>,
-        #[serde(default)]
-        settings: BTreeMap<String, String>,
-    },
+pub struct EngineRuntimeConfig {
+    pub id: String,
+    pub library_path: String,
+    pub config_path: Option<String>,
+    #[serde(default)]
+    pub settings: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

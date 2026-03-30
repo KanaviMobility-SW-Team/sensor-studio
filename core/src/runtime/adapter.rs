@@ -1,22 +1,33 @@
 use std::ffi::{CStr, CString};
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 
 use crate::engine::Engine;
-use crate::runtime::ffi::{EngineHandle, FFI_STATUS_OK, FfiPointCloudFrame};
-use crate::runtime::loader::ExternalEngineLibrary;
+use crate::runtime::ffi::{
+    EngineHandle, FFI_STATUS_OK, FfiApiBuffer, FfiApiInfo, FfiPointCloudFrame,
+};
+use crate::runtime::loader::EngineLibrary;
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
+
+#[derive(Debug, Clone)]
+pub struct EngineExtensionApiInfo {
+    pub name: String,
+    pub description: String,
+    pub input_schema_json: String,
+    pub output_schema_json: String,
+}
 
 pub struct FfiEngineAdapter {
     id: String,
-    library: ExternalEngineLibrary,
+    library: EngineLibrary,
     handle: EngineHandle,
 }
 
 impl FfiEngineAdapter {
     pub unsafe fn new(
         id: String,
-        library: ExternalEngineLibrary,
+        library: EngineLibrary,
         config_path: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let config_cstring = match config_path {
@@ -30,7 +41,7 @@ impl FfiEngineAdapter {
 
         let handle = (library.create)(config_ptr);
         if handle.is_null() {
-            return Err("failed to create external engine handle".into());
+            return Err("failed to create engine handle".into());
         }
 
         Ok(Self {
@@ -48,7 +59,7 @@ impl FfiEngineAdapter {
             unsafe { (self.library.process_packet)(self.handle, packet.as_ptr(), packet.len()) };
 
         if status != FFI_STATUS_OK {
-            return Err(format!("external engine process_packet failed: {status}").into());
+            return Err(format!("engine process_packet failed: {status}").into());
         }
 
         let mut frames = Vec::new();
@@ -65,7 +76,7 @@ impl FfiEngineAdapter {
                 unsafe { (self.library.pop_frame)(self.handle, ffi_frame.as_mut_ptr()) };
 
             if pop_status != FFI_STATUS_OK {
-                return Err(format!("external engine pop_frame failed: {pop_status}").into());
+                return Err(format!("engine pop_frame failed: {pop_status}").into());
             }
 
             let mut ffi_frame = unsafe { ffi_frame.assume_init() };
@@ -154,6 +165,87 @@ impl FfiEngineAdapter {
             _ => PointFieldDataType::Unknown,
         }
     }
+
+    fn read_c_string(ptr: *const std::ffi::c_char) -> Result<String, Box<dyn std::error::Error>> {
+        if ptr.is_null() {
+            return Ok(String::new());
+        }
+
+        Ok(unsafe { CStr::from_ptr(ptr) }.to_str()?.to_string())
+    }
+
+    fn read_api_buffer(&self, buffer: &FfiApiBuffer) -> Result<String, Box<dyn std::error::Error>> {
+        if buffer.data_ptr.is_null() || buffer.data_len == 0 {
+            return Ok(String::new());
+        }
+
+        let bytes = unsafe { std::slice::from_raw_parts(buffer.data_ptr, buffer.data_len) };
+
+        Ok(std::str::from_utf8(bytes)?.to_string())
+    }
+
+    pub fn list_extension_apis(
+        &self,
+    ) -> Result<Vec<EngineExtensionApiInfo>, Box<dyn std::error::Error>> {
+        let count = unsafe { (self.library.get_api_count)(self.handle) };
+
+        let mut apis = Vec::with_capacity(count);
+
+        for index in 0..count {
+            let mut ffi_info = std::mem::MaybeUninit::<FfiApiInfo>::uninit();
+
+            let status =
+                unsafe { (self.library.get_api_info)(self.handle, index, ffi_info.as_mut_ptr()) };
+
+            if status != FFI_STATUS_OK {
+                return Err(format!("failed to get api info at index {index}: {status}").into());
+            }
+
+            let ffi_info = unsafe { ffi_info.assume_init() };
+
+            apis.push(EngineExtensionApiInfo {
+                name: Self::read_c_string(ffi_info.name_ptr)?,
+                description: Self::read_c_string(ffi_info.description_ptr)?,
+                input_schema_json: Self::read_c_string(ffi_info.input_schema_json_ptr)?,
+                output_schema_json: Self::read_c_string(ffi_info.output_schema_json_ptr)?,
+            });
+        }
+
+        Ok(apis)
+    }
+
+    pub fn call_extension_api(
+        &self,
+        api_name: &str,
+        input_json: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let api_name = CString::new(api_name)?;
+        let input_json = CString::new(input_json)?;
+
+        let mut buffer = std::mem::MaybeUninit::<FfiApiBuffer>::uninit();
+
+        let status = unsafe {
+            (self.library.call_api)(
+                self.handle,
+                api_name.as_ptr(),
+                input_json.as_ptr(),
+                buffer.as_mut_ptr(),
+            )
+        };
+
+        if status != FFI_STATUS_OK {
+            return Err(format!("failed to call extension api: {status}").into());
+        }
+
+        let mut buffer = unsafe { buffer.assume_init() };
+        let output = self.read_api_buffer(&buffer)?;
+
+        unsafe {
+            (self.library.free_api_buffer)(&mut buffer as *mut FfiApiBuffer);
+        }
+
+        Ok(output)
+    }
 }
 
 // FfiEngineAdapter가 스레드 간에 이동해도 안전함을 컴파일러에게 강제로 알려줍니다.
@@ -176,6 +268,34 @@ impl Drop for FfiEngineAdapter {
     fn drop(&mut self) {
         unsafe {
             (self.library.destroy)(self.handle);
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SharedFfiEngineAdapter {
+    inner: Arc<Mutex<FfiEngineAdapter>>,
+    id: String,
+}
+
+impl SharedFfiEngineAdapter {
+    pub fn new(id: String, inner: Arc<Mutex<FfiEngineAdapter>>) -> Self {
+        Self { inner, id }
+    }
+}
+
+impl Engine for SharedFfiEngineAdapter {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
+        match self.inner.lock() {
+            Ok(mut adapter) => adapter.process(chunk),
+            Err(error) => {
+                eprintln!("failed to lock ffi engine adapter: {error}");
+                Vec::new()
+            }
         }
     }
 }
