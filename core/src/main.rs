@@ -1,5 +1,4 @@
 mod config;
-mod control;
 mod engine;
 mod instance;
 mod runtime;
