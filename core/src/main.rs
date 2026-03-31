@@ -27,15 +27,43 @@ use crate::stream::websocket::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let ws_bind_addr: SocketAddr = "0.0.0.0:8080".parse()?;
+    let mut config_path = "config/runtime.toml".to_string();
+    let mut cli_ws_bind_addr: Option<SocketAddr> = None;
+    let mut cli_broadcast_capacity: Option<usize> = None;
 
-    let (sender, _) = broadcast::channel::<WebSocketMessage>(32);
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--config" | "-c" => {
+                if let Some(val) = args.next() {
+                    config_path = val;
+                }
+            }
+            "--ws-addr" | "-w" => {
+                if let Some(val) = args.next() {
+                    cli_ws_bind_addr = Some(val.parse().expect("invalid WebSocket address format"));
+                }
+            }
+            "--broadcast-capacity" | "-b" => {
+                if let Some(val) = args.next() {
+                    cli_broadcast_capacity =
+                        Some(val.parse().expect("invalid broadcast capacity format"));
+                }
+            }
+            _ => {}
+        }
+    }
 
-    let runtime_config = load_runtime_config("config/runtime.toml")?;
-
+    let runtime_config = load_runtime_config(&config_path)?;
     if runtime_config.instances.is_empty() {
         return Err("runtime config must contain at least one instance".into());
     }
+
+    let ws_bind_addr = cli_ws_bind_addr.unwrap_or(runtime_config.server.ws_bind_addr);
+    let broadcast_capacity =
+        cli_broadcast_capacity.unwrap_or(runtime_config.server.broadcast_capacity);
+
+    let (sender, _) = broadcast::channel::<WebSocketMessage>(broadcast_capacity);
 
     let channel_registry = Arc::new(ChannelRegistry::from_instance_configs(
         &runtime_config.instances,

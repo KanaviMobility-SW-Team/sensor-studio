@@ -6,6 +6,8 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct RuntimeConfig {
+    #[serde(default)]
+    pub server: ServerConfig,
     pub instances: Vec<InstanceRuntimeConfig>,
 }
 
@@ -124,4 +126,20 @@ pub enum ChannelSchemaConfig {
 #[serde(rename_all = "snake_case")]
 pub enum ChannelEncoderConfig {
     Json,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ServerConfig {
+    pub ws_bind_addr: SocketAddr,
+    pub broadcast_capacity: usize,
+}
+
+// 기본값 구현
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            ws_bind_addr: "0.0.0.0:8080".parse().unwrap(),
+            broadcast_capacity: 32,
+        }
+    }
 }
