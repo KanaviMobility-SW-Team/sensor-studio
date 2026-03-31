@@ -239,10 +239,10 @@ impl WebSocketServer {
                     return serde_json::to_string(&response).ok();
                 };
 
-                let result = match shared.lock() {
+                let result = tokio::task::block_in_place(|| match shared.lock() {
                     Ok(adapter) => adapter.list_extension_apis(),
                     Err(error) => Err(format!("failed to lock engine adapter: {error}").into()),
-                };
+                });
 
                 match result {
                     Ok(apis) => {
@@ -292,10 +292,10 @@ impl WebSocketServer {
                     }
                 };
 
-                let result = match shared.lock() {
+                let result = tokio::task::block_in_place(|| match shared.lock() {
                     Ok(adapter) => adapter.call_extension_api(&api_name, &input_json),
                     Err(error) => Err(format!("failed to lock engine adapter: {error}").into()),
-                };
+                });
 
                 match result {
                     Ok(output_json) => {

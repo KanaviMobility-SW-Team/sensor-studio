@@ -290,12 +290,12 @@ impl Engine for SharedFfiEngineAdapter {
     }
 
     fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
-        match self.inner.lock() {
+        tokio::task::block_in_place(|| match self.inner.lock() {
             Ok(mut adapter) => adapter.process(chunk),
             Err(error) => {
                 eprintln!("failed to lock ffi engine adapter: {error}");
                 Vec::new()
             }
-        }
+        })
     }
 }
