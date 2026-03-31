@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::config::loader::load_runtime_config;
-use crate::instance::Instance;
+use crate::instance::{Instance, InstanceState};
 use crate::runtime::extensions::EngineExtensionRegistry;
 use crate::runtime::factory::{
     build_engine_extension_adapter, build_shared_engine, build_udp_transport,
@@ -111,19 +111,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!("instance '{}' started", instance_config.instance_id);
 
+            instance.set_state(InstanceState::Running);
+
+            const MAX_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
+            let mut backoff = std::time::Duration::from_millis(100);
+
             loop {
                 match instance.run_once().await {
                     Ok(frames) => {
+                        if instance.state == InstanceState::Error {
+                            println!("instance '{}' recovered", instance.id);
+                            backoff = std::time::Duration::from_millis(100);
+                        }
+                        instance.set_state(InstanceState::Running);
+
                         for frame in frames {
                             publisher.publish(frame);
                         }
                     }
                     Err(error) => {
+                        instance.set_state(InstanceState::Error);
                         eprintln!(
-                            "runtime loop failed for instance '{}': {error}",
-                            instance_config.instance_id
+                            "runtime loop error for instance '{}': {error}, retrying in {:?}",
+                            instance.id, backoff
                         );
-                        break;
+                        tokio::time::sleep(backoff).await;
+                        backoff = (backoff * 2).min(MAX_BACKOFF);
                     }
                 }
             }
