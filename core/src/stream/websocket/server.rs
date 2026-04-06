@@ -95,7 +95,7 @@ impl WebSocketServer {
             return;
         }
 
-        let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
+        let (out_tx, mut out_rx) = tokio::sync::mpsc::channel::<Message>(64);
 
         tokio::spawn(async move {
             while let Some(message) = out_rx.recv().await {
@@ -133,7 +133,18 @@ impl WebSocketServer {
                             let binary =
                                 make_message_data_frame(*subscription_id, timestamp_ns, &payload);
 
-                            let _ = out_tx_clone.send(Message::Binary(binary.into()));
+                            if let Err(err) = out_tx_clone.try_send(Message::Binary(binary.into()))
+                            {
+                                if let tokio::sync::mpsc::error::TrySendError::Full(_) = err {
+                                    eprintln!(
+                                        "websocket outbound queue full for client. dropping frame for subscription_id={}",
+                                        *subscription_id
+                                    );
+                                } else {
+                                    // 채널이 닫혔을 때(Closed 오류 등)
+                                    break;
+                                }
+                            }
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(count)) => {
@@ -194,6 +205,7 @@ impl WebSocketServer {
                                     {
                                         if out_tx_clone
                                             .send(Message::Text(response.into()))
+                                            .await
                                             .is_err()
                                         {
                                             return;
