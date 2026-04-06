@@ -7,7 +7,6 @@ pub type TransportId = String;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransportKind {
     Udp,
-    Tcp,
     Usb,
     Serial,
 }

@@ -1,3 +1,7 @@
+[server]
+ws_bind_addr = "0.0.0.0:8080"
+broadcast_capacity = 32
+
 [[instances]]
 instance_id = "instance-1"
 
