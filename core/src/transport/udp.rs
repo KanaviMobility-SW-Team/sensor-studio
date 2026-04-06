@@ -21,6 +21,7 @@ pub struct UdpTransport {
     id: TransportId,
     config: UdpTransportConfig,
     socket: UdpSocket,
+    recv_buffer: Vec<u8>,
 }
 
 impl UdpTransport {
@@ -51,8 +52,14 @@ impl UdpTransport {
 
         let std_socket: std::net::UdpSocket = socket.into();
         let socket = UdpSocket::from_std(std_socket)?;
+        let recv_buffer = vec![0u8; config.buffer_size];
 
-        Ok(Self { id, config, socket })
+        Ok(Self {
+            id,
+            config,
+            socket,
+            recv_buffer,
+        })
     }
 
     pub fn id(&self) -> &str {
@@ -64,15 +71,14 @@ impl UdpTransport {
     }
 
     pub async fn read_chunk(&mut self) -> io::Result<Option<(SocketAddr, Bytes)>> {
-        let mut buffer = vec![0u8; self.config.buffer_size];
-        let (size, sender_addr) = self.socket.recv_from(&mut buffer).await?;
+        let (size, sender_addr) = self.socket.recv_from(&mut self.recv_buffer).await?;
 
         if size == 0 {
             return Ok(None);
         }
 
-        buffer.truncate(size);
-        Ok(Some((sender_addr, Bytes::from(buffer))))
+        let data = Bytes::copy_from_slice(&self.recv_buffer[..size]);
+        Ok(Some((sender_addr, data)))
     }
 
     fn discover_ipv4_interfaces() -> io::Result<Vec<Ipv4Addr>> {
