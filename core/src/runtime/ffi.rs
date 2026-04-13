@@ -51,8 +51,12 @@ pub type EngineCreateFn = unsafe extern "C" fn(config_path: *const c_char) -> En
 
 pub type EngineDestroyFn = unsafe extern "C" fn(handle: EngineHandle);
 
-pub type EngineProcessPacketFn =
-    unsafe extern "C" fn(handle: EngineHandle, data_ptr: *const c_uchar, data_len: usize) -> c_int;
+pub type EngineProcessPacketFn = unsafe extern "C" fn(
+    handle: EngineHandle,
+    data_ptr: *const c_uchar,
+    data_len: usize,
+    sender_info_ptr: *const c_char,
+) -> c_int;
 
 pub type EngineHasFrameFn = unsafe extern "C" fn(handle: EngineHandle) -> bool;
 

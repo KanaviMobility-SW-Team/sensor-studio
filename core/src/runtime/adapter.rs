@@ -54,9 +54,19 @@ impl FfiEngineAdapter {
     fn process_packet(
         &mut self,
         packet: &Bytes,
+        sender_addr: std::net::SocketAddr,
     ) -> Result<Vec<PointCloudFrame>, Box<dyn std::error::Error>> {
-        let status =
-            unsafe { (self.library.process_packet)(self.handle, packet.as_ptr(), packet.len()) };
+        let sender_str =
+            CString::new(sender_addr.to_string()).unwrap_or_else(|_| CString::new("").unwrap());
+
+        let status = unsafe {
+            (self.library.process_packet)(
+                self.handle,
+                packet.as_ptr(),
+                packet.len(),
+                sender_str.as_ptr(),
+            )
+        };
 
         if status != FFI_STATUS_OK {
             return Err(format!("engine process_packet failed: {status}").into());
@@ -256,11 +266,12 @@ impl Engine for FfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
-        self.process_packet(&chunk).unwrap_or_else(|error| {
-            eprintln!("Error processing packet in FfiEngineAdapter: {error}");
-            Vec::new()
-        })
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
+        self.process_packet(&chunk, sender_addr)
+            .unwrap_or_else(|error| {
+                eprintln!("Error processing packet in FfiEngineAdapter: {error}");
+                Vec::new()
+            })
     }
 }
 
@@ -289,9 +300,9 @@ impl Engine for SharedFfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
         tokio::task::block_in_place(|| match self.inner.lock() {
-            Ok(mut adapter) => adapter.process(chunk),
+            Ok(mut adapter) => adapter.process(chunk, sender_addr),
             Err(error) => {
                 eprintln!("failed to lock ffi engine adapter: {error}");
                 Vec::new()

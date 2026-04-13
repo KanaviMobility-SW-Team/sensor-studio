@@ -42,8 +42,8 @@ impl Instance {
 
     pub async fn run_once(&mut self) -> io::Result<Vec<PointCloudFrame>> {
         match self.transport.read_chunk().await? {
-            Some((_sender_addr, chunk)) => {
-                let frames = self.engine.process(chunk);
+            Some((sender_addr, chunk)) => {
+                let frames = self.engine.process(chunk, sender_addr);
                 Ok(frames)
             }
             None => Ok(Vec::new()),
