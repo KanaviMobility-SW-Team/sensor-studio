@@ -47,7 +47,7 @@ pub struct FfiApiBuffer {
 
 pub type EngineHandle = *mut c_void;
 
-pub type EngineCreateFn = unsafe extern "C" fn(config_path: *const c_char) -> EngineHandle;
+pub type EngineCreateFn = unsafe extern "C" fn(config_json_ptr: *const c_char) -> EngineHandle;
 
 pub type EngineDestroyFn = unsafe extern "C" fn(handle: EngineHandle);
 

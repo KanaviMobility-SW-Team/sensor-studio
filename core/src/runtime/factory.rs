@@ -12,13 +12,17 @@ pub fn build_engine_extension_adapter(
 ) -> Result<SharedEngineExtension, Box<dyn std::error::Error>> {
     let engine_config = &config.engine;
     let library = unsafe { EngineLibrary::load(&engine_config.library_path)? };
-    let adapter = unsafe {
-        FfiEngineAdapter::new(
-            engine_config.id.clone(),
-            library,
-            engine_config.config_path.as_deref(),
-        )?
-    };
+
+    let unified_config = serde_json::json!({
+        "id": config.engine.id,
+        "frame_id": config.channel.frame_id,
+        "sensors": config.engine.sensors,
+        "settings": config.engine.settings,
+    });
+    let config_json = unified_config.to_string();
+
+    let adapter =
+        unsafe { FfiEngineAdapter::new(config.engine.id.clone(), library, &config_json)? };
 
     Ok(Arc::new(Mutex::new(adapter)))
 }

@@ -28,18 +28,12 @@ impl FfiEngineAdapter {
     pub unsafe fn new(
         id: String,
         library: EngineLibrary,
-        config_path: Option<&str>,
+        config_json: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let config_cstring = match config_path {
-            Some(path) => Some(CString::new(path)?),
-            None => None,
-        };
+        let config_cstring = CString::new(config_json)?;
+        let config_ptr = config_cstring.as_ptr();
 
-        let config_ptr = config_cstring
-            .as_ref()
-            .map_or(std::ptr::null(), |value| value.as_ptr());
-
-        let handle = (library.create)(config_ptr);
+        let handle = unsafe { (library.create)(config_ptr) };
         if handle.is_null() {
             return Err("failed to create engine handle".into());
         }
