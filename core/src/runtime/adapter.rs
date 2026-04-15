@@ -28,18 +28,12 @@ impl FfiEngineAdapter {
     pub unsafe fn new(
         id: String,
         library: EngineLibrary,
-        config_path: Option<&str>,
+        config_json: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let config_cstring = match config_path {
-            Some(path) => Some(CString::new(path)?),
-            None => None,
-        };
+        let config_cstring = CString::new(config_json)?;
+        let config_ptr = config_cstring.as_ptr();
 
-        let config_ptr = config_cstring
-            .as_ref()
-            .map_or(std::ptr::null(), |value| value.as_ptr());
-
-        let handle = (library.create)(config_ptr);
+        let handle = unsafe { (library.create)(config_ptr) };
         if handle.is_null() {
             return Err("failed to create engine handle".into());
         }
@@ -54,9 +48,19 @@ impl FfiEngineAdapter {
     fn process_packet(
         &mut self,
         packet: &Bytes,
+        sender_addr: std::net::SocketAddr,
     ) -> Result<Vec<PointCloudFrame>, Box<dyn std::error::Error>> {
-        let status =
-            unsafe { (self.library.process_packet)(self.handle, packet.as_ptr(), packet.len()) };
+        let sender_str =
+            CString::new(sender_addr.to_string()).unwrap_or_else(|_| CString::new("").unwrap());
+
+        let status = unsafe {
+            (self.library.process_packet)(
+                self.handle,
+                packet.as_ptr(),
+                packet.len(),
+                sender_str.as_ptr(),
+            )
+        };
 
         if status != FFI_STATUS_OK {
             return Err(format!("engine process_packet failed: {status}").into());
@@ -256,11 +260,12 @@ impl Engine for FfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
-        self.process_packet(&chunk).unwrap_or_else(|error| {
-            eprintln!("Error processing packet in FfiEngineAdapter: {error}");
-            Vec::new()
-        })
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
+        self.process_packet(&chunk, sender_addr)
+            .unwrap_or_else(|error| {
+                eprintln!("Error processing packet in FfiEngineAdapter: {error}");
+                Vec::new()
+            })
     }
 }
 
@@ -289,9 +294,9 @@ impl Engine for SharedFfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame> {
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
         tokio::task::block_in_place(|| match self.inner.lock() {
-            Ok(mut adapter) => adapter.process(chunk),
+            Ok(mut adapter) => adapter.process(chunk, sender_addr),
             Err(error) => {
                 eprintln!("failed to lock ffi engine adapter: {error}");
                 Vec::new()

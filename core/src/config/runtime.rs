@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct RuntimeConfig {
@@ -33,17 +33,6 @@ impl RuntimeConfig {
                 return Err(format!(
                     "Engine library path does not exist for instance '{}': {}",
                     instance.instance_id, instance.engine.library_path
-                ));
-            }
-
-            // 엔진 설정 파일 경로 존재 여부 검증 (옵션이지만 지정된 경우 존재해야 함)
-            if instance.engine.config_path.is_some()
-                && !Path::new(&instance.engine.config_path.clone().unwrap()).exists()
-            {
-                return Err(format!(
-                    "Engine config path does not exist for instance '{}': {}",
-                    instance.instance_id,
-                    instance.engine.config_path.clone().unwrap()
                 ));
             }
 
@@ -81,13 +70,33 @@ pub struct InstanceRuntimeConfig {
     pub channel: InstanceChannelConfig,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EngineSensorConfig {
+    pub ip: String,
+    #[serde(default)]
+    pub x: f32,
+    #[serde(default)]
+    pub y: f32,
+    #[serde(default)]
+    pub z: f32,
+    #[serde(default)]
+    pub roll: f32,
+    #[serde(default)]
+    pub pitch: f32,
+    #[serde(default)]
+    pub yaw: f32,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EngineRuntimeConfig {
     pub id: String,
     pub library_path: String,
-    pub config_path: Option<String>,
+
     #[serde(default)]
     pub settings: BTreeMap<String, String>,
+
+    #[serde(default)]
+    pub sensors: Vec<EngineSensorConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -111,6 +120,7 @@ pub struct InstanceChannelConfig {
     pub channel_id: u32,
     pub source_id: String,
     pub topic: String,
+    pub frame_id: String,
     pub schema: ChannelSchemaConfig,
     pub encoder: ChannelEncoderConfig,
 }

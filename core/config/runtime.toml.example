@@ -8,7 +8,6 @@ instance_id = "instance-1"
 [instances.engine]
 id = "lidar-engine"
 library_path = "engines/libexternal_lidar_engine.so"
-config_path = "engines/external_lidar_engine.toml"
 
 [instances.engine.settings]
 profile = "default"
@@ -22,9 +21,30 @@ multicast_addr = "224.0.0.5"
 join_all_interfaces = true
 interface_addrs = []
 
+# [센서 1]
+[[instances.engine.sensors]]
+ip = "192.168.123.200"
+x = 0.0
+y = 0.0
+z = 0.0
+roll = 0.0
+pitch = 0.0
+yaw = 0.0
+
+# # [센서 2]
+# [[instances.engine.sensors]]
+# ip = "192.168.123.201"
+# x = -2.0
+# y = 0.0
+# z = 0.0
+# roll = 0.0
+# pitch = 0.0
+# yaw = 180.0            # 후방
+
 [instances.channel]
 channel_id = 1
 source_id = "sample_sensor"
 topic = "/pointcloud/sample_sensor"
+frame_id = "map"
 schema = "point_cloud"
 encoder = "json"
