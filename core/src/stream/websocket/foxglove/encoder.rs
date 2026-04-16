@@ -1,7 +1,10 @@
+//! Foxglove 프로토콜 메시지 데이터 직렬화 및 인코딩 모듈
+
 use serde_json::json;
 
 use crate::types::{PointCloudFrame, PointFieldDataType};
 
+/// 바이너리 데이터 프레임 바이트 배열 생성
 pub fn make_message_data_frame(subscription_id: u32, timestamp_ns: u64, payload: &[u8]) -> Vec<u8> {
     let mut frame = Vec::with_capacity(1 + 4 + 8 + payload.len());
 

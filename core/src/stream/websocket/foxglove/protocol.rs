@@ -1,10 +1,14 @@
+//! Foxglove 프로토콜 규격 및 메시지 처리 모듈
+
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::stream::channel::{ChannelDescriptor, ChannelEncoder, ChannelRegistry, ChannelSchema};
 
+/// Foxglove 서브프로토콜 식별자
 pub const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.websocket.v1";
 
+/// 초기 접속 시 제공할 서버 메타데이터 생성
 pub fn foxglove_server_info_message() -> String {
     json!({
         "op": "serverInfo",
@@ -53,6 +57,7 @@ pub fn foxglove_advertise_message(registry: &ChannelRegistry) -> String {
     .to_string()
 }
 
+/// 클라이언트 전송 구독 제어 래퍼
 #[derive(Debug)]
 pub enum FoxgloveClientCommand {
     Subscribe {

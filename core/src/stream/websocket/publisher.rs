@@ -1,9 +1,12 @@
+//! 웹소켓 채널 데이터 발행 모듈
+
 use tokio::sync::broadcast;
 
 use crate::stream::StreamPublisher;
 use crate::stream::websocket::WebSocketMessage;
 use crate::types::PointCloudFrame;
 
+/// 통합 웹소켓 채널 브로드캐스트 발행자
 pub struct WebSocketPublisher {
     sender: broadcast::Sender<WebSocketMessage>,
     source_id: String,

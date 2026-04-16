@@ -1,8 +1,11 @@
+//! 커스텀 웹소켓 제어 프로토콜 규격 모듈
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::runtime::adapter::EngineExtensionApiInfo;
 
+/// 클라이언트 전송 웹소켓 제어 명령어
 #[derive(Debug, Deserialize)]
 #[serde(tag = "op")]
 pub enum ClientControlMessage {
@@ -22,6 +25,7 @@ pub enum ClientControlMessage {
     },
 }
 
+/// 서버 송신 제어 상태 및 응답 결과
 #[derive(Debug, Serialize)]
 #[serde(tag = "op")]
 pub enum ServerControlMessage {
@@ -51,6 +55,7 @@ pub enum ServerControlMessage {
     },
 }
 
+/// 엔진 확장 API 메타데이터 전달 객체
 #[derive(Debug, Serialize)]
 pub struct EngineExtensionApiInfoDto {
     pub name: String,

@@ -1,9 +1,15 @@
+//! C 호환 FFI 데이터 구조체 및 라이프사이클 함수 모듈
+
 use std::ffi::{c_char, c_int, c_uchar, c_ulonglong, c_void};
 
+/// FFI 성공 상태
 pub const FFI_STATUS_OK: c_int = 0;
+/// FFI 프레임 없음 상태
 pub const FFI_STATUS_NO_FRAME: c_int = 1;
+/// FFI 에러 상태
 pub const FFI_STATUS_ERROR: c_int = -1;
 
+/// C 호환 포인트 필드 레이아웃
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct FfiPointField {
@@ -13,6 +19,7 @@ pub struct FfiPointField {
     pub count: u32,
 }
 
+/// C 호환 포인트 클라우드 프레임 메타데이터 및 포인터
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct FfiPointCloudFrame {
@@ -29,6 +36,7 @@ pub struct FfiPointCloudFrame {
     pub data_len: usize,
 }
 
+/// 외부 노출 API 메타데이터 정보 포인터
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct FfiApiInfo {
@@ -38,6 +46,7 @@ pub struct FfiApiInfo {
     pub output_schema_json_ptr: *const c_char,
 }
 
+/// 단일 외부 API 결과 버퍼 포인터
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct FfiApiBuffer {
