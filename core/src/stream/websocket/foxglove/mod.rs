@@ -1,3 +1,5 @@
+//! Foxglove 웹소켓 프로토콜 통합 모듈
+
 pub mod encoder;
 pub mod protocol;
 

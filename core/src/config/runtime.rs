@@ -4,6 +4,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+/// 코어 시스템 전체 런타임 설정
 #[derive(Clone, Debug, Deserialize)]
 pub struct RuntimeConfig {
     #[serde(default)]
@@ -62,6 +63,7 @@ impl RuntimeConfig {
     }
 }
 
+/// 개별 센서 인스턴스 구동 설정
 #[derive(Clone, Debug, Deserialize)]
 pub struct InstanceRuntimeConfig {
     pub instance_id: String,
@@ -87,6 +89,7 @@ pub struct EngineSensorConfig {
     pub yaw: f32,
 }
 
+/// (FFI) 플러그인 로드 및 동적 주입용 데이터
 #[derive(Clone, Debug, Deserialize)]
 pub struct EngineRuntimeConfig {
     pub id: String,
@@ -138,6 +141,7 @@ pub enum ChannelEncoderConfig {
     Json,
 }
 
+/// Foxglove WebSocket 및 전역 통신 설정
 #[derive(Clone, Debug, Deserialize)]
 pub struct ServerConfig {
     pub ws_bind_addr: SocketAddr,

@@ -6,6 +6,7 @@ use crate::runtime::ffi::{
     EngineProcessPacketFn,
 };
 
+/// 외부 공유 라이브러리 핸들 및 FFI 함수 포인터 구조체
 pub struct EngineLibrary {
     _library: Library,
     pub create: EngineCreateFn,
@@ -21,6 +22,7 @@ pub struct EngineLibrary {
 }
 
 impl EngineLibrary {
+    /// 동적 라이브러리 및 필수 FFI 심볼 로드
     pub unsafe fn load(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let library = unsafe { Library::new(path)? };
 

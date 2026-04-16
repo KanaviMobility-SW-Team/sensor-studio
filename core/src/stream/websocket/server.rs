@@ -1,3 +1,5 @@
+//! 웹소켓 프로토콜 서버 모듈
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -23,11 +25,13 @@ use crate::stream::websocket::protocol::{
     ClientControlMessage, EngineExtensionApiInfoDto, ServerControlMessage,
 };
 
+/// 메시지 제어 연산 분석 래퍼
 #[derive(Debug, Deserialize)]
 struct MessageOpEnvelope {
     op: String,
 }
 
+/// 웹소켓 서버 전역 상태
 #[derive(Clone)]
 pub struct WebSocketServerState {
     pub sender: broadcast::Sender<WebSocketMessage>,
@@ -35,6 +39,7 @@ pub struct WebSocketServerState {
     pub extension_registry: EngineExtensionRegistry,
 }
 
+/// 웹소켓 서버 핸들러
 pub struct WebSocketServer;
 
 impl WebSocketServer {
@@ -136,7 +141,7 @@ impl WebSocketServer {
                             if let Err(err) = out_tx_clone.try_send(Message::Binary(binary.into()))
                             {
                                 if let tokio::sync::mpsc::error::TrySendError::Full(_) = err {
-                                    eprintln!(
+                                    tracing::warn!(
                                         "websocket outbound queue full for client. dropping frame for subscription_id={}",
                                         *subscription_id
                                     );
@@ -148,7 +153,7 @@ impl WebSocketServer {
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(count)) => {
-                        eprintln!("websocket client lagged, skipped {count} messages");
+                        tracing::warn!("websocket client lagged, skipped {count} messages");
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => {
@@ -180,19 +185,11 @@ impl WebSocketServer {
                                                 } => {
                                                     subscriptions
                                                         .insert(subscription_id, channel_id);
-                                                    println!(
-                                                        "subscribe: subscription_id={}, channel_id={}",
-                                                        subscription_id, channel_id
-                                                    );
                                                 }
                                                 FoxgloveClientCommand::Unsubscribe {
                                                     subscription_id,
                                                 } => {
                                                     subscriptions.remove(&subscription_id);
-                                                    println!(
-                                                        "unsubscribe: subscription_id={}",
-                                                        subscription_id
-                                                    );
                                                 }
                                             }
                                         }

@@ -1,3 +1,5 @@
+//! UDP 기반 데이터 네트워크 수신 계층 모듈
+
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr};
 
@@ -8,6 +10,7 @@ use tokio::net::UdpSocket;
 
 use super::TransportId;
 
+/// UDP 소켓 생성을 위한 구성요소 구조체
 #[derive(Clone, Debug)]
 pub struct UdpTransportConfig {
     pub bind_addr: SocketAddr,
@@ -17,6 +20,7 @@ pub struct UdpTransportConfig {
     pub interface_addrs: Vec<Ipv4Addr>,
 }
 
+/// 비동기 멀티캐스트 및 데이터그램 패킷 수신 구조체
 pub struct UdpTransport {
     id: TransportId,
     config: UdpTransportConfig,
@@ -25,6 +29,7 @@ pub struct UdpTransport {
 }
 
 impl UdpTransport {
+    /// UDP 소켓 구조체 생성 및 네트워크 바인딩
     pub async fn bind(id: TransportId, config: UdpTransportConfig) -> io::Result<Self> {
         let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
@@ -44,7 +49,14 @@ impl UdpTransport {
                     continue;
                 }
 
-                let _ = socket.join_multicast_v4(&multicast_addr, &interface_ip);
+                if let Err(e) = socket.join_multicast_v4(&multicast_addr, &interface_ip) {
+                    tracing::warn!(
+                        "Failed to join multicast {} on interface {}: {}",
+                        multicast_addr,
+                        interface_ip,
+                        e
+                    );
+                }
             }
         }
 
@@ -70,6 +82,7 @@ impl UdpTransport {
         &self.config
     }
 
+    /// 데이터 패킷 비동기 수신
     pub async fn read_chunk(&mut self) -> io::Result<Option<(SocketAddr, Bytes)>> {
         let (size, sender_addr) = self.socket.recv_from(&mut self.recv_buffer).await?;
 

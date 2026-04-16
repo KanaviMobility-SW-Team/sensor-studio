@@ -1,3 +1,5 @@
+//! 주요 런타임 요소 생성 팩토리 함수 모듈
+
 use std::sync::{Arc, Mutex};
 
 use crate::config::{InstanceRuntimeConfig, TransportRuntimeConfig};
@@ -7,6 +9,7 @@ use crate::runtime::extensions::SharedEngineExtension;
 use crate::runtime::loader::EngineLibrary;
 use crate::transport::udp::{UdpTransport, UdpTransportConfig};
 
+/// 설정 파일 기반 FFI 엔진 어댑터 객체 초기화 및 생성
 pub fn build_engine_extension_adapter(
     config: &InstanceRuntimeConfig,
 ) -> Result<SharedEngineExtension, Box<dyn std::error::Error>> {
@@ -27,6 +30,7 @@ pub fn build_engine_extension_adapter(
     Ok(Arc::new(Mutex::new(adapter)))
 }
 
+/// 단일 엔진 모듈에 대한 공유 어댑터 래퍼 생성
 pub fn build_shared_engine(
     config: &InstanceRuntimeConfig,
     shared: SharedEngineExtension,
@@ -37,6 +41,7 @@ pub fn build_shared_engine(
     )))
 }
 
+/// UDP 트랜스포트 객체 초기화 및 네트워크 바인딩
 pub async fn build_udp_transport(
     config: &InstanceRuntimeConfig,
 ) -> Result<UdpTransport, Box<dyn std::error::Error>> {

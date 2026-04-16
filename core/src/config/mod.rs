@@ -1,3 +1,5 @@
+//! 시스템 전역 설정(runtime.toml) 파싱 및 데이터 모델 모듈
+
 pub mod loader;
 pub mod runtime;
 

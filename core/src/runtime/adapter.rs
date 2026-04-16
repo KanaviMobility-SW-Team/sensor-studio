@@ -10,6 +10,7 @@ use crate::runtime::ffi::{
 use crate::runtime::loader::EngineLibrary;
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
 
+/// 엔진이 제공하는 동적 제어/설정 API(Extension API) 메타데이터
 #[derive(Debug, Clone)]
 pub struct EngineExtensionApiInfo {
     pub name: String,
@@ -18,6 +19,7 @@ pub struct EngineExtensionApiInfo {
     pub output_schema_json: String,
 }
 
+/// C-FFI 기반 동적 라이브러리 엔진 통신 어댑터
 pub struct FfiEngineAdapter {
     id: String,
     library: EngineLibrary,
@@ -35,8 +37,14 @@ impl FfiEngineAdapter {
 
         let handle = unsafe { (library.create)(config_ptr) };
         if handle.is_null() {
+            tracing::error!("Failed to create engine handle from library FFI");
             return Err("failed to create engine handle".into());
         }
+
+        tracing::info!(
+            "Engine extension adapter `{}` created from FFI successfully",
+            id
+        );
 
         Ok(Self {
             id,
@@ -86,7 +94,7 @@ impl FfiEngineAdapter {
             let mut ffi_frame = unsafe { ffi_frame.assume_init() };
             match self.convert_frame(&ffi_frame) {
                 Ok(frame) => frames.push(frame),
-                Err(error) => eprintln!("failed to convert ffi frame: {error}"),
+                Err(error) => tracing::error!("failed to convert ffi frame: {error}"),
             }
 
             unsafe {
@@ -263,7 +271,11 @@ impl Engine for FfiEngineAdapter {
     fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
         self.process_packet(&chunk, sender_addr)
             .unwrap_or_else(|error| {
-                eprintln!("Error processing packet in FfiEngineAdapter: {error}");
+                tracing::error!(
+                    "Error processing packet in FfiEngineAdapter [{}]: {}",
+                    self.id,
+                    error
+                );
                 Vec::new()
             })
     }
@@ -277,6 +289,7 @@ impl Drop for FfiEngineAdapter {
     }
 }
 
+/// 스레드 공유 및 제어를 위한 FFI 엔진 어댑터 래퍼
 #[derive(Clone)]
 pub struct SharedFfiEngineAdapter {
     inner: Arc<Mutex<FfiEngineAdapter>>,
@@ -298,7 +311,7 @@ impl Engine for SharedFfiEngineAdapter {
         tokio::task::block_in_place(|| match self.inner.lock() {
             Ok(mut adapter) => adapter.process(chunk, sender_addr),
             Err(error) => {
-                eprintln!("failed to lock ffi engine adapter: {error}");
+                tracing::error!("failed to lock ffi engine adapter: {error}");
                 Vec::new()
             }
         })
