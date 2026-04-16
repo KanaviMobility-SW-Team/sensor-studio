@@ -126,11 +126,11 @@ Transport Layer는 센서 장비로부터 데이터를 수신하는 계층이다
 
 Transport Layer의 주요 역할:
 
--   센서 데이터 수신
--   Raw byte stream 전달
+-   센서 데이터 수신 및 다중 센서 지원을 위한 송신지 IP(Sender IP) 트래킹
+-   Raw byte stream 및 송신지 정보 전달
 -   입력 버퍼 관리
 
-Transport Layer는 프로토콜을 해석하지 않는다. 수신된 데이터는 그대로
+Transport Layer는 프로토콜을 해석하지 않는다. 수신된 데이터와 패킷의 출처(Sender IP)는 다중 센서 Multiplexing 처리를 위해 그대로
 Engine으로 전달된다.
 
 ## 3.3 Engine Extension Registry
@@ -240,6 +240,7 @@ Sensor Studio에서는 Configuration Handling을 Engine에 위임하는
 
 Core의 역할:
 
+-   단일 JSON-FFI 페이로드(`config_json`)를 생성 및 주입하여 Engine 동적 초기화
 -   WebSocket을 통한 JSON-RPC 제어 명령 수신
 -   설정 적용 결과 클라이언트로 반환
 -   단일 WebSocket 채널 기반으로 통신 스펙 통합

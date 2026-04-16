@@ -57,3 +57,21 @@ UI는 복잡한 비즈니스 로직을 배제하고 시각화와 상호작용에
  | core | 모듈 격리 및 Foxglove 멀티플렉싱을 전담하는 Rust 기반 핵심 백엔드 시스템 |
  | sensor-studio-engines | 센서 모델별 프로토콜 파싱을 담당하는 C-FFI 기반 Engine 플러그인 |
  | ui | 런타임 동적 제어 컴포넌트 및 실시간 3D 렌더링에 집중하는 Flutter 클라이언트 |
+
+---
+
+## Author
+
+- **Team:** Kanavi Mobility Sensor Fusion Lab S/W Team
+- **Author:** 송윤수 (immsong@icloud.com)
+- **Contact:** tsw_sensor@kanavi-auto.com
+- **Repository:** [KanaviMobility-SW-Team/sensor-studio](https://github.com/KanaviMobility-SW-Team/sensor-studio)
+
+---
+
+## License
+
+이 프로젝트의 소스 코드는 참고 및 학습 목적으로만 공개됩니다.
+소스 코드를 열람하거나 다운로드할 수 있으나, **Kanavi Mobility의 사전 서면 동의 없이 사용, 복제, 수정, 병합, 배포 및 상업적 이용을 하는 것은 엄격히 금지됩니다.**
+
+자세한 내용은 [LICENSE](LICENSE) 파일을 참고해 주시기 바랍니다.

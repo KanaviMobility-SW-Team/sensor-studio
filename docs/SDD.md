@@ -38,9 +38,11 @@ core/src/
 
 시스템 구동 시 다음 순서에 따라 자원을 할당하고 스레드를 분배한다.
 1. **Config 파싱:** CLI 인자 및 `runtime.toml`을 파싱해 `InstanceConfig` 정보들을 얻는다.
-2. **Global Channel 생성:** 단일 연결망을 위한 `tokio::sync::broadcast::channel<WebSocketMessage>(capacity)`를 생성한다.
-3. **Extension / Channel Registry 생성:** UI와의 통신 메타데이터를 관리하기 위해 `ChannelRegistry`(스트리밍 Topic 목적)와 `EngineExtensionRegistry`(제어 목적)를 초기화한다. 
-4. **Task 분배 (Zero Blast Radius):**
+2. **Logger 시스템 초기화:** `env_logger` 기반의 정규화된 로깅 시스템을 초기화하여 Core 런타임뿐 아니라 C-FFI 플러그인 경계를 넘어 통합된 로그 수집 환경을 구성한다.
+3. **Global Channel 생성:** 단일 연결망을 위한 `tokio::sync::broadcast::channel<WebSocketMessage>(capacity)`를 생성한다.
+4. **Extension / Channel Registry 생성:** UI와의 통신 메타데이터를 관리하기 위해 `ChannelRegistry`(스트리밍 Topic 목적)와 `EngineExtensionRegistry`(제어 목적)를 초기화한다. 
+5. **JSON-FFI 주입:** 기존 파일 경로 기반의 설정을 탈피하고, 파싱된 센서 및 설정 정보를 포함한 단일 JSON 페이로드(`config_json`)를 생성하여 Engine FFI 초기화 함수에 주입한다.
+6. **Task 분배 (Zero Blast Radius):**
    - **`WebSocketServer::serve`:** 단 1개의 태스크에서 수신 커넥션 및 송신을 관리한다.
    - **`Instance Loop` 생성:** `runtime_config.instances` 개수만큼 반복하며 `tokio::spawn`을 이용해 독립적인 Task를 각각 분리(Isolate)하여 실행시킨다.
 
@@ -56,10 +58,10 @@ core/src/
   ```rust
   pub trait Engine: Send {
       fn id(&self) -> &str;
-      fn process(&mut self, chunk: Bytes) -> Vec<PointCloudFrame>;
+      fn process(&mut self, chunk: Bytes, sender_addr: SocketAddr) -> Vec<PointCloudFrame>;
   }
   ```
-  단발성, 무상태 형태로 Byte Chunk를 받아 PointCloud 패킷 리스트로 변환한다.
+  단발성, 무상태 형태로 Byte Chunk와 패킷 송신지 정보(`sender_addr`)를 받아 다중 센서 Multiplexing 처리를 거친 후 PointCloud 패킷 리스트로 변환한다.
 - **Synchronization (Control):** `SharedEngineExtension`는 `Arc<Mutex<FfiEngineAdapter>>` 구조로 래핑되어 있다. `WebSocketServer`를 통한 클라이언트 제어(JSON-RPC API 호출)가 들어오면 Mutex Lock을 취해 FFI(C 인터페이스) 함수를 안전하게 호출한다.
 
 ## 3.4 Isolated Instance Loop (`instance/mod.rs`)

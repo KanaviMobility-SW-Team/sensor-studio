@@ -52,6 +52,8 @@ Sensor Studio는 분산 처리 및 고가용성 철학에 기반하여 설계되
 - **FR-CORE-010 스레드 점유 방지:** 외부 C-FFI 기반 엔진의 연산 지연이 코어 시스템의 비동기 처리에 병목을 주지 않도록, 스레드 혼잡 현상을 원천 차단하는 구조를 적용한다.
 - **FR-CORE-011 데이터 수신 레이어 최적화:** 초당 수만 건의 UDP 패킷 스트리밍을 견디기 위해, 서버 자원 할당을 최소화하는 버퍼 재사용(Buffer Reuse) 구조를 필수적으로 적용해야 한다.
 - **FR-CORE-012 Pure Data Transformation:** Engine은 상태를 가지지 않는 순수 데이터 변환 모듈처럼 동작해야 하며, 오프셋 메타데이터만으로 파싱을 수행하여 `PointCloudFrame`을 Core로 반환한다.
+- **FR-CORE-013 Multi-Sensor Multiplexing Support:** Core 시스템은 단일 포트로 들어오는 다중 센서의 UDP 패킷을 구별하기 위해, Engine에게 수신된 패킷의 송신지 IP(`sender_addr`) 정보를 전달해야 한다.
+- **FR-CORE-014 Dynamic Configuration Injection:** Core는 센서 장비의 구체적인 설정 스키마 및 옵션을 알 필요 없이, 파싱된 범용 JSON 페이로드(`config_json`)를 Engine에 주입하여 동적으로 초기화한다. 이를 통해 센서별 옵션 파라미터가 추가되거나 변경되더라도 Core 시스템의 코드 수정 및 재배포가 발생하지 않아야 한다.
 
 ## 3.3 Dual-Role WebSocket Multiplexing
 
