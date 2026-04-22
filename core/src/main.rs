@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let timer = ChronoLocal::new("%Y-%m-%d %H:%M:%S%.3f".to_string());
 
     // 콘솔/파일 환경변수 분리 필터 구성
-    let console_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "trace".into());
+    let console_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into());
     let file_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| "sensor_studio_core=info".into());
 
