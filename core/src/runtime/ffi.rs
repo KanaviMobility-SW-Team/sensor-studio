@@ -103,3 +103,5 @@ pub type FfiLogCallback =
 
 pub type EngineSetLoggerFn =
     unsafe extern "C" fn(callback: Option<FfiLogCallback>, level: FfiLogLevel) -> i32;
+
+pub type EngineGetVersionFn = unsafe extern "C" fn() -> *const c_char;

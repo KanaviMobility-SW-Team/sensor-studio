@@ -58,6 +58,27 @@ pub fn build_engine_extension_adapter(
     let engine_config = &config.engine;
     let library = unsafe { EngineLibrary::load(&engine_config.library_path)? };
 
+    // Engine FFI 라이브러리에서 제공하는 버전 정보 조회 (디버깅 및 호환성 검증 목적)
+    let version_cstr = unsafe {
+        let version_ptr = (library.get_engine_version)();
+        if version_ptr.is_null() {
+            tracing::warn!(
+                "Engine library '{}' returned null version string pointer",
+                engine_config.library_path
+            );
+            CStr::from_bytes_with_nul(b"unknown\0").unwrap()
+        } else {
+            CStr::from_ptr(version_ptr)
+        }
+    };
+
+    let version_str = version_cstr.to_string_lossy();
+    tracing::info!(
+        "Loaded engine library '{}', version: {}",
+        engine_config.library_path,
+        version_str
+    );
+
     // logger callback 등록
     let set_logger_status =
         unsafe { (library.set_logger)(Some(engine_log_callback), FfiLogLevel::Debug) };

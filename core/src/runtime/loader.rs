@@ -2,8 +2,8 @@ use libloading::Library;
 
 use crate::runtime::ffi::{
     EngineCallApiFn, EngineCreateFn, EngineDestroyFn, EngineFreeApiBufferFn, EngineFreeFrameFn,
-    EngineGetApiCountFn, EngineGetApiInfoFn, EngineHasFrameFn, EnginePopFrameFn,
-    EngineProcessPacketFn, EngineSetLoggerFn,
+    EngineGetApiCountFn, EngineGetApiInfoFn, EngineGetVersionFn, EngineHasFrameFn,
+    EnginePopFrameFn, EngineProcessPacketFn, EngineSetLoggerFn,
 };
 
 /// 외부 공유 라이브러리 핸들 및 FFI 함수 포인터 구조체
@@ -20,6 +20,7 @@ pub struct EngineLibrary {
     pub call_api: EngineCallApiFn,
     pub free_api_buffer: EngineFreeApiBufferFn,
     pub set_logger: EngineSetLoggerFn,
+    pub get_engine_version: EngineGetVersionFn,
 }
 
 impl EngineLibrary {
@@ -44,6 +45,9 @@ impl EngineLibrary {
 
         let set_logger = unsafe { *library.get::<EngineSetLoggerFn>(b"engine_set_logger")? };
 
+        let get_engine_version =
+            unsafe { *library.get::<EngineGetVersionFn>(b"engine_get_version")? };
+
         Ok(Self {
             _library: library,
             create,
@@ -57,6 +61,7 @@ impl EngineLibrary {
             call_api,
             free_api_buffer,
             set_logger,
+            get_engine_version,
         })
     }
 }
