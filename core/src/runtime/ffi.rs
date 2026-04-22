@@ -87,3 +87,19 @@ pub type EngineCallApiFn = unsafe extern "C" fn(
 ) -> c_int;
 
 pub type EngineFreeApiBufferFn = unsafe extern "C" fn(buffer: *mut FfiApiBuffer);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FfiLogLevel {
+    Error = 1,
+    Warn = 2,
+    Info = 3,
+    Debug = 4,
+    Trace = 5,
+}
+
+pub type FfiLogCallback =
+    unsafe extern "C" fn(level: FfiLogLevel, target_ptr: *const c_char, message_ptr: *const c_char);
+
+pub type EngineSetLoggerFn =
+    unsafe extern "C" fn(callback: Option<FfiLogCallback>, level: FfiLogLevel) -> i32;
