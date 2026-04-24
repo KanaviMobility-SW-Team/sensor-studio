@@ -2,10 +2,18 @@
 
 pub mod udp;
 
+use std::future::Future;
+use std::io;
+use std::net::SocketAddr;
+use std::pin::Pin;
+
 use bytes::Bytes;
 
 /// 트랜스포트 식별자 타입
 pub type TransportId = String;
+
+/// 비동기 트랜스포트 작업 결과 타입
+pub type TransportFuture<'a, T> = Pin<Box<dyn Future<Output = io::Result<T>> + Send + 'a>>;
 
 /// 통합 트랜스포트 분류 열거형
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -15,11 +23,28 @@ pub enum TransportKind {
     Serial,
 }
 
-/// 공통 트랜스포트 기능 정의 트레이트
+/// 트랜스포트에서 읽은 원시 데이터 청크
+#[derive(Debug, Clone)]
+pub struct TransportChunk {
+    pub source_addr: SocketAddr,
+    pub source_id: String,
+    pub data: Bytes,
+}
+
+/// 트랜스포트로 전송할 원시 데이터 청크
+#[derive(Debug, Clone)]
+pub struct TransportWrite {
+    pub target_addr: Option<SocketAddr>,
+    pub target_id: Option<String>,
+    pub data: Bytes,
+}
+
 pub trait Transport {
     fn id(&self) -> &str;
 
     fn kind(&self) -> TransportKind;
 
-    fn read_chunk(&mut self) -> Option<Bytes>;
+    fn read_chunk(&mut self) -> TransportFuture<'_, Option<TransportChunk>>;
+
+    fn write_chunk(&mut self, chunk: TransportWrite) -> TransportFuture<'_, ()>;
 }
