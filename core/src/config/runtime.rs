@@ -56,6 +56,9 @@ impl RuntimeConfig {
                         ));
                     }
                 }
+                TransportRuntimeConfig::Usb(_) => {
+                    return Err("USB transport is not implemented yet".into());
+                }
             }
         }
 
@@ -106,6 +109,7 @@ pub struct EngineRuntimeConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransportRuntimeConfig {
     Udp(UdpTransportRuntimeConfig),
+    Usb(UsbTransportRuntimeConfig),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -116,6 +120,39 @@ pub struct UdpTransportRuntimeConfig {
     pub join_all_interfaces: bool,
     #[serde(default)]
     pub interface_addrs: Vec<Ipv4Addr>,
+}
+
+fn default_usb_buffer_size() -> usize {
+    512 * 1024 // 524288
+}
+
+fn default_usb_read_timeout_ms() -> u64 {
+    1000
+}
+
+fn default_usb_transact_timeout_ms() -> u64 {
+    300
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UsbTransportRuntimeConfig {
+    pub transport_id: String,
+
+    pub vendor_id: String,
+    pub product_id: String,
+
+    pub interface: u8,
+    pub endpoint_in: String,
+    pub endpoint_out: String,
+
+    #[serde(default = "default_usb_buffer_size")]
+    pub buffer_size: usize,
+
+    #[serde(default = "default_usb_read_timeout_ms")]
+    pub read_timeout_ms: u64,
+
+    #[serde(default = "default_usb_transact_timeout_ms")]
+    pub transact_timeout_ms: u64,
 }
 
 #[derive(Clone, Debug, Deserialize)]

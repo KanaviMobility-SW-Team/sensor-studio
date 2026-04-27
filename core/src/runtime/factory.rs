@@ -135,5 +135,8 @@ pub async fn build_udp_transport(
 
             Ok(transport)
         }
+        TransportRuntimeConfig::Usb(_) => {
+            return Err("USB transport is not implemented yet".into());
+        }
     }
 }
