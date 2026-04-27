@@ -7,7 +7,7 @@
 use std::io;
 
 use crate::engine::Engine;
-use crate::transport::udp::UdpTransport;
+use crate::transport::Transport;
 use crate::types::PointCloudFrame;
 
 /// 인스턴스 고유 식별자
@@ -36,12 +36,16 @@ pub struct Instance {
     /// 데이터를 PointCloud로 변환하는 어댑터 엔진 인터페이스
     engine: Box<dyn Engine + Send>,
     /// 센서 패킷 수신 네트워크 레이어
-    transport: UdpTransport,
+    transport: Box<dyn Transport + Send>,
 }
 
 impl Instance {
     /// 인스턴스 초기화
-    pub fn new(id: impl Into<String>, engine: Box<dyn Engine>, transport: UdpTransport) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        engine: Box<dyn Engine + Send>,
+        transport: Box<dyn Transport + Send>,
+    ) -> Self {
         Self {
             id: id.into(),
             state: InstanceState::Created,
@@ -63,8 +67,8 @@ impl Instance {
     /// 1회 사이클 실행 (패킷 1개 수신 후 즉시 PointCloud 변환)
     pub async fn run_once(&mut self) -> io::Result<Vec<PointCloudFrame>> {
         match self.transport.read_chunk().await? {
-            Some((sender_addr, chunk)) => {
-                let frames = self.engine.process(chunk, sender_addr);
+            Some(chunk) => {
+                let frames = self.engine.process(chunk.data, chunk.source_addr);
                 Ok(frames)
             }
             None => Ok(Vec::new()),

@@ -200,8 +200,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let mut instance =
-                Instance::new(instance_config.instance_id.clone(), engine, transport);
+            let mut instance = Instance::new(
+                instance_config.instance_id.clone(),
+                engine,
+                Box::new(transport),
+            );
 
             let mut publisher = WebSocketPublisher::new(sender, publish_source_id);
 
