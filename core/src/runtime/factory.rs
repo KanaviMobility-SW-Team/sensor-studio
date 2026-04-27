@@ -9,7 +9,9 @@ use crate::runtime::adapter::{FfiEngineAdapter, SharedFfiEngineAdapter};
 use crate::runtime::extensions::SharedEngineExtension;
 use crate::runtime::ffi::{FFI_STATUS_OK, FfiLogLevel};
 use crate::runtime::loader::EngineLibrary;
+use crate::transport::Transport;
 use crate::transport::udp::{UdpTransport, UdpTransportConfig};
+use crate::transport::usb::UsbTransport;
 
 unsafe extern "C" fn engine_log_callback(
     level: FfiLogLevel,
@@ -116,10 +118,10 @@ pub fn build_shared_engine(
     )))
 }
 
-/// UDP 트랜스포트 객체 초기화 및 네트워크 바인딩
-pub async fn build_udp_transport(
+/// 인스턴스 설정에 맞는 트랜스포트 객체 초기화
+pub async fn build_transport(
     config: &InstanceRuntimeConfig,
-) -> Result<UdpTransport, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn Transport + Send>, Box<dyn std::error::Error>> {
     match &config.transport {
         TransportRuntimeConfig::Udp(transport) => {
             let transport_config = UdpTransportConfig {
@@ -133,10 +135,12 @@ pub async fn build_udp_transport(
             let transport =
                 UdpTransport::bind(config.instance_id.clone(), transport_config).await?;
 
-            Ok(transport)
+            Ok(Box::new(transport) as Box<dyn Transport + Send>)
         }
-        TransportRuntimeConfig::Usb(_) => {
-            return Err("USB transport is not implemented yet".into());
+        TransportRuntimeConfig::Usb(transport) => {
+            let transport = UsbTransport::new(transport.clone());
+
+            Ok(Box::new(transport) as Box<dyn Transport + Send>)
         }
     }
 }

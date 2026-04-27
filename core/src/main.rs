@@ -21,7 +21,7 @@ use crate::config::loader::load_runtime_config;
 use crate::instance::{Instance, InstanceState};
 use crate::runtime::extensions::EngineExtensionRegistry;
 use crate::runtime::factory::{
-    build_engine_extension_adapter, build_shared_engine, build_udp_transport,
+    build_engine_extension_adapter, build_shared_engine, build_transport,
 };
 use crate::stream::StreamPublisher;
 use crate::stream::channel::ChannelRegistry;
@@ -178,7 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let transport = match build_udp_transport(&instance_config).await {
+            let transport = match build_transport(&instance_config).await {
                 Ok(value) => value,
                 Err(error) => {
                     tracing::error!(
@@ -200,11 +200,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let mut instance = Instance::new(
-                instance_config.instance_id.clone(),
-                engine,
-                Box::new(transport),
-            );
+            let mut instance =
+                Instance::new(instance_config.instance_id.clone(), engine, transport);
 
             let mut publisher = WebSocketPublisher::new(sender, publish_source_id);
 

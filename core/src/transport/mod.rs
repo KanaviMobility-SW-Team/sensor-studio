@@ -1,6 +1,7 @@
 //! 단말 센서 데이터 수신 및 전송 계층 모듈
 
 pub mod udp;
+pub mod usb;
 
 use std::future::Future;
 use std::io;
