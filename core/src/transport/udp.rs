@@ -8,6 +8,8 @@ use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
+use crate::transport::{Transport, TransportChunk, TransportFuture, TransportKind, TransportWrite};
+
 use super::TransportId;
 
 /// UDP 소켓 생성을 위한 구성요소 구조체
@@ -109,5 +111,38 @@ impl UdpTransport {
         }
 
         Ok(result)
+    }
+}
+
+impl Transport for UdpTransport {
+    fn id(&self) -> &str {
+        self.id()
+    }
+
+    fn kind(&self) -> TransportKind {
+        TransportKind::Udp
+    }
+
+    fn read_chunk(&mut self) -> TransportFuture<'_, Option<TransportChunk>> {
+        Box::pin(async move {
+            let Some((source_addr, data)) = UdpTransport::read_chunk(self).await? else {
+                return Ok(None);
+            };
+
+            Ok(Some(TransportChunk {
+                source_addr,
+                source_id: format!("udp://{}", source_addr),
+                data,
+            }))
+        })
+    }
+
+    fn write_chunk(&mut self, _chunk: TransportWrite) -> TransportFuture<'_, ()> {
+        Box::pin(async move {
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "UDP transport write is not supported yet",
+            ))
+        })
     }
 }
