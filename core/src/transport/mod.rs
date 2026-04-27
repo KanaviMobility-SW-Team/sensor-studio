@@ -31,12 +31,27 @@ pub struct TransportChunk {
     pub data: Bytes,
 }
 
+#[derive(Debug, Clone)]
+pub enum TransportResponseMode {
+    None,
+    One,
+    Count(usize),
+    UntilTimeout,
+}
+
+impl Default for TransportResponseMode {
+    fn default() -> Self {
+        Self::One
+    }
+}
+
 /// 트랜스포트로 전송할 원시 데이터 청크
 #[derive(Debug, Clone)]
 pub struct TransportRequest {
     pub target_addr: Option<SocketAddr>,
     pub target_id: Option<String>,
     pub data: Bytes,
+    pub response_mode: TransportResponseMode,
 }
 
 pub trait Transport {
@@ -49,5 +64,5 @@ pub trait Transport {
     fn transact_chunk(
         &mut self,
         request: TransportRequest,
-    ) -> TransportFuture<'_, Option<TransportChunk>>;
+    ) -> TransportFuture<'_, Vec<TransportChunk>>;
 }

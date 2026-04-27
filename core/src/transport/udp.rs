@@ -142,7 +142,7 @@ impl Transport for UdpTransport {
     fn transact_chunk(
         &mut self,
         _request: TransportRequest,
-    ) -> TransportFuture<'_, Option<TransportChunk>> {
+    ) -> TransportFuture<'_, Vec<TransportChunk>> {
         Box::pin(async move {
             Err(io::Error::new(
                 io::ErrorKind::Unsupported,
