@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 
-use crate::engine::Engine;
+use crate::engine::{Engine, EngineProcessResult};
 use crate::runtime::ffi::{
     EngineHandle, FFI_STATUS_OK, FfiApiBuffer, FfiApiInfo, FfiPointCloudFrame,
 };
@@ -268,16 +268,17 @@ impl Engine for FfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
-        self.process_packet(&chunk, sender_addr)
-            .unwrap_or_else(|error| {
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> EngineProcessResult {
+        EngineProcessResult::from_frames(self.process_packet(&chunk, sender_addr).unwrap_or_else(
+            |error| {
                 tracing::error!(
                     "Error processing packet in FfiEngineAdapter [{}]: {}",
                     self.id,
                     error
                 );
                 Vec::new()
-            })
+            },
+        ))
     }
 }
 
@@ -307,12 +308,12 @@ impl Engine for SharedFfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> EngineProcessResult {
         tokio::task::block_in_place(|| match self.inner.lock() {
             Ok(mut adapter) => adapter.process(chunk, sender_addr),
             Err(error) => {
                 tracing::error!("failed to lock ffi engine adapter: {error}");
-                Vec::new()
+                EngineProcessResult::empty()
             }
         })
     }

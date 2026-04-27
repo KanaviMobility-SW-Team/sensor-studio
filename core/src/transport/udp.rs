@@ -8,7 +8,9 @@ use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
-use crate::transport::{Transport, TransportChunk, TransportFuture, TransportKind, TransportWrite};
+use crate::transport::{
+    Transport, TransportChunk, TransportFuture, TransportKind, TransportRequest,
+};
 
 use super::TransportId;
 
@@ -137,11 +139,14 @@ impl Transport for UdpTransport {
         })
     }
 
-    fn write_chunk(&mut self, _chunk: TransportWrite) -> TransportFuture<'_, ()> {
+    fn transact_chunk(
+        &mut self,
+        _request: TransportRequest,
+    ) -> TransportFuture<'_, Option<TransportChunk>> {
         Box::pin(async move {
             Err(io::Error::new(
                 io::ErrorKind::Unsupported,
-                "UDP transport write is not supported yet",
+                "UDP transport transact is not supported yet",
             ))
         })
     }

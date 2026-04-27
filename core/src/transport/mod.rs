@@ -33,7 +33,7 @@ pub struct TransportChunk {
 
 /// 트랜스포트로 전송할 원시 데이터 청크
 #[derive(Debug, Clone)]
-pub struct TransportWrite {
+pub struct TransportRequest {
     pub target_addr: Option<SocketAddr>,
     pub target_id: Option<String>,
     pub data: Bytes,
@@ -46,5 +46,8 @@ pub trait Transport {
 
     fn read_chunk(&mut self) -> TransportFuture<'_, Option<TransportChunk>>;
 
-    fn write_chunk(&mut self, chunk: TransportWrite) -> TransportFuture<'_, ()>;
+    fn transact_chunk(
+        &mut self,
+        request: TransportRequest,
+    ) -> TransportFuture<'_, Option<TransportChunk>>;
 }
