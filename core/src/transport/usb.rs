@@ -5,10 +5,15 @@
 
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::time::Duration;
+
+use bytes::Bytes;
+use rusb::{DeviceHandle, GlobalContext};
 
 use crate::config::UsbTransportRuntimeConfig;
 use crate::transport::{
     Transport, TransportChunk, TransportFuture, TransportId, TransportKind, TransportRequest,
+    TransportResponseMode,
 };
 
 /// USB 장치를 기존 Engine FFI의 sender_addr 구조에 맞추기 위한 synthetic address
@@ -30,6 +35,10 @@ pub struct UsbTransportConfig {
 pub struct UsbTransport {
     id: TransportId,
     config: UsbTransportConfig,
+    handle: DeviceHandle<GlobalContext>,
+    read_timeout: Duration,
+    transact_timeout: Duration,
+    buffer: Vec<u8>,
 }
 
 impl UsbTransport {
@@ -45,9 +54,41 @@ impl UsbTransport {
             transact_timeout_ms: config.transact_timeout_ms,
         };
 
+        let mut handle =
+            rusb::open_device_with_vid_pid(parsed_config.vendor_id, parsed_config.product_id)
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!(
+                            "USB device not found: vid=0x{:04x}, pid=0x{:04x}",
+                            parsed_config.vendor_id, parsed_config.product_id
+                        ),
+                    )
+                })?;
+
+        handle
+            .claim_interface(parsed_config.interface)
+            .map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "failed to claim USB interface {}: {}",
+                        parsed_config.interface, error
+                    ),
+                )
+            })?;
+
+        let read_timeout = Duration::from_millis(parsed_config.read_timeout_ms);
+        let transact_timeout = Duration::from_millis(parsed_config.transact_timeout_ms);
+        let buffer = vec![0_u8; parsed_config.buffer_size];
+
         Ok(Self {
-            id: config.transport_id.clone(),
+            id: config.transport_id,
             config: parsed_config,
+            handle,
+            read_timeout,
+            transact_timeout,
+            buffer,
         })
     }
 
@@ -78,22 +119,114 @@ impl Transport for UsbTransport {
 
     fn read_chunk(&mut self) -> TransportFuture<'_, Option<TransportChunk>> {
         Box::pin(async move {
-            Err(io::Error::new(
-                io::ErrorKind::Unsupported,
-                "USB transport read is not implemented yet",
-            ))
+            let read_size = match self.handle.read_bulk(
+                self.config.endpoint_in,
+                &mut self.buffer,
+                self.read_timeout,
+            ) {
+                Ok(size) => size,
+                Err(rusb::Error::Timeout) => {
+                    return Ok(None);
+                }
+                Err(error) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("USB bulk read failed: {error}"),
+                    ));
+                }
+            };
+
+            if read_size == 0 {
+                return Ok(None);
+            }
+
+            let data = Bytes::copy_from_slice(&self.buffer[..read_size]);
+
+            Ok(Some(TransportChunk {
+                source_addr: self.synthetic_source_addr(),
+                source_id: self.source_id(),
+                data,
+            }))
         })
     }
 
     fn transact_chunk(
         &mut self,
-        _request: TransportRequest,
+        request: TransportRequest,
     ) -> TransportFuture<'_, Vec<TransportChunk>> {
         Box::pin(async move {
-            Err(io::Error::new(
-                io::ErrorKind::Unsupported,
-                "USB transport transact is not implemented yet",
-            ))
+            let written = self
+                .handle
+                .write_bulk(
+                    self.config.endpoint_out,
+                    &request.data,
+                    self.transact_timeout,
+                )
+                .map_err(|error| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("USB bulk write failed: {error}"),
+                    )
+                })?;
+
+            if written != request.data.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    format!(
+                        "USB bulk write incomplete: written={}, expected={}",
+                        written,
+                        request.data.len()
+                    ),
+                ));
+            }
+
+            let expected_response_count = match request.response_mode {
+                TransportResponseMode::None => {
+                    return Ok(Vec::new());
+                }
+                TransportResponseMode::One => Some(1),
+                TransportResponseMode::Count(count) => Some(count),
+                TransportResponseMode::UntilTimeout => None,
+            };
+
+            let mut responses = Vec::new();
+
+            loop {
+                if let Some(expected_count) = expected_response_count {
+                    if responses.len() >= expected_count {
+                        break;
+                    }
+                }
+
+                let read_size = match self.handle.read_bulk(
+                    self.config.endpoint_in,
+                    &mut self.buffer,
+                    self.transact_timeout,
+                ) {
+                    Ok(size) => size,
+                    Err(rusb::Error::Timeout) => {
+                        break;
+                    }
+                    Err(error) => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("USB bulk read response failed: {error}"),
+                        ));
+                    }
+                };
+
+                if read_size == 0 {
+                    break;
+                }
+
+                responses.push(TransportChunk {
+                    source_addr: self.synthetic_source_addr(),
+                    source_id: self.source_id(),
+                    data: Bytes::copy_from_slice(&self.buffer[..read_size]),
+                });
+            }
+
+            Ok(responses)
         })
     }
 }

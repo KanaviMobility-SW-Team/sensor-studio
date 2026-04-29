@@ -56,9 +56,7 @@ impl RuntimeConfig {
                         ));
                     }
                 }
-                TransportRuntimeConfig::Usb(_) => {
-                    return Err("USB transport is not implemented yet".into());
-                }
+                TransportRuntimeConfig::Usb(_) => {}
             }
         }
 
