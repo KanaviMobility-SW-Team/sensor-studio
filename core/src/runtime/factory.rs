@@ -138,7 +138,7 @@ pub async fn build_transport(
             Ok(Box::new(transport) as Box<dyn Transport + Send>)
         }
         TransportRuntimeConfig::Usb(transport) => {
-            let transport = UsbTransport::new(transport.clone())?;
+            let transport = UsbTransport::new(config.instance_id.clone(), transport.clone())?;
 
             Ok(Box::new(transport) as Box<dyn Transport + Send>)
         }

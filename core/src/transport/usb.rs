@@ -42,7 +42,7 @@ pub struct UsbTransport {
 }
 
 impl UsbTransport {
-    pub fn new(config: UsbTransportRuntimeConfig) -> io::Result<Self> {
+    pub fn new(id: TransportId, config: UsbTransportRuntimeConfig) -> io::Result<Self> {
         let parsed_config = UsbTransportConfig {
             vendor_id: parse_hex_u16(&config.vendor_id)?,
             product_id: parse_hex_u16(&config.product_id)?,
@@ -83,7 +83,7 @@ impl UsbTransport {
         let buffer = vec![0_u8; parsed_config.buffer_size];
 
         Ok(Self {
-            id: config.transport_id,
+            id,
             config: parsed_config,
             handle,
             read_timeout,

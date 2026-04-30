@@ -134,8 +134,6 @@ fn default_usb_transact_timeout_ms() -> u64 {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UsbTransportRuntimeConfig {
-    pub transport_id: String,
-
     pub vendor_id: String,
     pub product_id: String,
 
