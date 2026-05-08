@@ -49,8 +49,6 @@ impl Default for TransportResponseMode {
 /// 트랜스포트로 전송할 원시 데이터 청크
 #[derive(Debug, Clone)]
 pub struct TransportRequest {
-    pub target_addr: Option<SocketAddr>,
-    pub target_id: Option<String>,
     pub data: Bytes,
     pub response_mode: TransportResponseMode,
 }

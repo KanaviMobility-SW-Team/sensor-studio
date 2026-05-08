@@ -105,3 +105,27 @@ pub type EngineSetLoggerFn =
     unsafe extern "C" fn(callback: Option<FfiLogCallback>, level: FfiLogLevel) -> i32;
 
 pub type EngineGetVersionFn = unsafe extern "C" fn() -> *const c_char;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub enum FfiTransportResponseMode {
+    None = 0,
+    One = 1,
+    Count = 2,
+    UntilTimeout = 3,
+}
+
+#[repr(C)]
+pub struct FfiTransportRequest {
+    pub data_ptr: *mut u8,
+    pub data_len: usize,
+    pub response_mode: FfiTransportResponseMode,
+    pub response_count: usize,
+}
+
+pub type EngineHasTransportRequestFn = unsafe extern "C" fn(handle: EngineHandle) -> bool;
+
+pub type EnginePopTransportRequestFn =
+    unsafe extern "C" fn(handle: EngineHandle, out_request: *mut FfiTransportRequest) -> i32;
+
+pub type EngineFreeTransportRequestFn = unsafe extern "C" fn(request: *mut FfiTransportRequest);

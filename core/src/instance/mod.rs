@@ -4,7 +4,6 @@
 //! 전송 계층(`transport`)을 통해 데이터를 수신하고, 엔진(`engine`)을 통해 이를
 //! 포인트 클라우드로 변환하는 독립된 작업 단위
 
-use std::collections::VecDeque;
 use std::io;
 
 use crate::engine::Engine;
@@ -13,8 +12,6 @@ use crate::types::PointCloudFrame;
 
 /// 인스턴스 고유 식별자
 pub type InstanceId = String;
-
-const MAX_TRANSPORT_REQUESTS_PER_CYCLE: usize = 8;
 
 /// 센서 인스턴스 동작 상태
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,45 +66,40 @@ impl Instance {
 
     /// 1회 사이클 실행
     ///
-    /// 수신된 청크 1개를 엔진에 전달하고, 엔진이 반환한 transport request를
-    /// 제한된 횟수 내에서 처리한 뒤 생성된 PointCloud frame 목록을 반환한다.
+    /// 엔진이 보유한 transport request가 있으면 현재 transport로 먼저 전송하고,
+    /// 응답 청크를 다시 엔진에 전달한다.
+    /// 처리할 request가 없으면 transport에서 일반 수신 청크를 읽어 엔진에 전달한다.
     pub async fn run_once(&mut self) -> io::Result<Vec<PointCloudFrame>> {
+        if let Some(request) = self.engine.pop_transport_request()? {
+            tracing::info!(
+                "Instance '{}' processing transport request payload size {} bytes",
+                self.id,
+                request.data.len()
+            );
+
+            let responses = self.transport.transact_chunk(request).await?;
+            tracing::info!(
+                "Instance '{}' received {} response(s) for transport request",
+                self.id,
+                responses.len()
+            );
+
+            let mut frames = Vec::new();
+
+            for response in responses {
+                let result = self.engine.process(response.data, response.source_addr);
+                frames.extend(result.frames);
+            }
+
+            return Ok(frames);
+        }
+
         let Some(chunk) = self.transport.read_chunk().await? else {
             return Ok(Vec::new());
         };
 
-        let mut frames = Vec::new();
-        let mut pending_requests = VecDeque::new();
-
         let result = self.engine.process(chunk.data, chunk.source_addr);
-        frames.extend(result.frames);
-        pending_requests.extend(result.requests);
-
-        let mut processed_requests = 0;
-
-        while let Some(request) = pending_requests.pop_front() {
-            if processed_requests >= MAX_TRANSPORT_REQUESTS_PER_CYCLE {
-                tracing::warn!(
-                    instance_id = %self.id,
-                    max_requests = MAX_TRANSPORT_REQUESTS_PER_CYCLE,
-                    "transport request processing limit reached"
-                );
-                break;
-            }
-
-            processed_requests += 1;
-
-            let responses = self.transport.transact_chunk(request).await?;
-
-            for response in responses {
-                let response_result = self.engine.process(response.data, response.source_addr);
-
-                frames.extend(response_result.frames);
-                pending_requests.extend(response_result.requests);
-            }
-        }
-
-        Ok(frames)
+        Ok(result.frames)
     }
 
     /// 인스턴스 상태 변경 및 로그 출력

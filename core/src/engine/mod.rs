@@ -1,3 +1,4 @@
+use std::io;
 use std::net::SocketAddr;
 
 use bytes::Bytes;
@@ -11,15 +12,11 @@ pub type EngineId = String;
 #[derive(Debug, Default)]
 pub struct EngineProcessResult {
     pub frames: Vec<PointCloudFrame>,
-    pub requests: Vec<TransportRequest>,
 }
 
 impl EngineProcessResult {
     pub fn from_frames(frames: Vec<PointCloudFrame>) -> Self {
-        Self {
-            frames,
-            requests: Vec::new(),
-        }
+        Self { frames }
     }
 
     pub fn empty() -> Self {
@@ -34,4 +31,8 @@ pub trait Engine: Send {
 
     /// 수신된 바이트 청크와 송신지 IP(`sender_addr`)를 바탕으로 PointCloud 데이터 변환
     fn process(&mut self, chunk: Bytes, sender_addr: SocketAddr) -> EngineProcessResult;
+
+    fn pop_transport_request(&mut self) -> io::Result<Option<TransportRequest>> {
+        Ok(None)
+    }
 }
