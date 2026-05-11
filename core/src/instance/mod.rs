@@ -78,12 +78,6 @@ impl Instance {
             );
 
             let responses = self.transport.transact_chunk(request).await?;
-            tracing::info!(
-                "Instance '{}' received {} response(s) for transport request",
-                self.id,
-                responses.len()
-            );
-
             let mut frames = Vec::new();
 
             for response in responses {
