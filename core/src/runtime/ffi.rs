@@ -105,3 +105,32 @@ pub type EngineSetLoggerFn =
     unsafe extern "C" fn(callback: Option<FfiLogCallback>, level: FfiLogLevel) -> i32;
 
 pub type EngineGetVersionFn = unsafe extern "C" fn() -> *const c_char;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub enum FfiTransportResponseMode {
+    None = 0,
+    One = 1,
+    Count = 2,
+    UntilTimeout = 3,
+}
+
+#[repr(C)]
+pub struct FfiTransportRequest {
+    pub data_ptr: *mut u8,
+    pub data_len: usize,
+    pub response_mode: FfiTransportResponseMode,
+    pub response_count: usize,
+}
+
+pub type EngineHasTransportRequestFn = unsafe extern "C" fn(handle: EngineHandle) -> bool;
+
+pub type EnginePopTransportRequestFn =
+    unsafe extern "C" fn(handle: EngineHandle, out_request: *mut FfiTransportRequest) -> i32;
+
+pub type EngineFreeTransportRequestFn = unsafe extern "C" fn(request: *mut FfiTransportRequest);
+
+/// 종료 시 transport로 전송할 페이로드 조회
+/// 반환값 0: 유효 페이로드, 그 외: 전송 불필요
+pub type EngineGetShutdownPayloadFn =
+    unsafe extern "C" fn(handle: EngineHandle, out_buffer: *mut FfiApiBuffer) -> i32;

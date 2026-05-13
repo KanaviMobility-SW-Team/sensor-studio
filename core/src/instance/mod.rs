@@ -7,7 +7,7 @@
 use std::io;
 
 use crate::engine::Engine;
-use crate::transport::udp::UdpTransport;
+use crate::transport::{Transport, TransportRequest, TransportResponseMode};
 use crate::types::PointCloudFrame;
 
 /// 인스턴스 고유 식별자
@@ -36,12 +36,16 @@ pub struct Instance {
     /// 데이터를 PointCloud로 변환하는 어댑터 엔진 인터페이스
     engine: Box<dyn Engine + Send>,
     /// 센서 패킷 수신 네트워크 레이어
-    transport: UdpTransport,
+    transport: Box<dyn Transport + Send>,
 }
 
 impl Instance {
     /// 인스턴스 초기화
-    pub fn new(id: impl Into<String>, engine: Box<dyn Engine>, transport: UdpTransport) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        engine: Box<dyn Engine + Send>,
+        transport: Box<dyn Transport + Send>,
+    ) -> Self {
         Self {
             id: id.into(),
             state: InstanceState::Created,
@@ -60,15 +64,30 @@ impl Instance {
         self.transport.id()
     }
 
-    /// 1회 사이클 실행 (패킷 1개 수신 후 즉시 PointCloud 변환)
+    /// 1회 사이클 실행
+    ///
+    /// 엔진이 보유한 transport request가 있으면 현재 transport로 먼저 전송하고,
+    /// 응답 청크를 다시 엔진에 전달한다.
+    /// 처리할 request가 없으면 transport에서 일반 수신 청크를 읽어 엔진에 전달한다.
     pub async fn run_once(&mut self) -> io::Result<Vec<PointCloudFrame>> {
-        match self.transport.read_chunk().await? {
-            Some((sender_addr, chunk)) => {
-                let frames = self.engine.process(chunk, sender_addr);
-                Ok(frames)
+        if let Some(request) = self.engine.pop_transport_request()? {
+            let responses = self.transport.transact_chunk(request).await?;
+            let mut frames = Vec::new();
+
+            for response in responses {
+                let result = self.engine.process(response.data, response.source_addr);
+                frames.extend(result.frames);
             }
-            None => Ok(Vec::new()),
+
+            return Ok(frames);
         }
+
+        let Some(chunk) = self.transport.read_chunk().await? else {
+            return Ok(Vec::new());
+        };
+
+        let result = self.engine.process(chunk.data, chunk.source_addr);
+        Ok(result.frames)
     }
 
     /// 인스턴스 상태 변경 및 로그 출력
@@ -80,6 +99,25 @@ impl Instance {
                 tracing::info!("Instance '{}' state changed to {:?}", self.id, state);
             }
             self.state = state;
+        }
+    }
+
+    /// transport shutdown 패킷 전송 (엔진이 shutdown_payload를 제공하는 경우)
+    pub async fn shutdown(&mut self) {
+        if let Some(payload) = self.engine.shutdown_payload() {
+            let request = TransportRequest {
+                data: payload,
+                response_mode: TransportResponseMode::None,
+            };
+
+            tracing::info!("Instance '{}' sending shutdown payload", self.id);
+
+            if let Err(error) = self.transport.transact_chunk(request).await {
+                tracing::warn!(
+                    "Instance '{}' failed to send shutdown payload: {error}",
+                    self.id
+                );
+            }
         }
     }
 }

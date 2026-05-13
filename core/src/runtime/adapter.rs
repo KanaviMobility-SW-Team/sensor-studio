@@ -1,13 +1,16 @@
 use std::ffi::{CStr, CString};
+use std::io;
 use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 
-use crate::engine::Engine;
+use crate::engine::{Engine, EngineProcessResult};
 use crate::runtime::ffi::{
-    EngineHandle, FFI_STATUS_OK, FfiApiBuffer, FfiApiInfo, FfiPointCloudFrame,
+    EngineHandle, FFI_STATUS_OK, FfiApiBuffer, FfiApiInfo, FfiPointCloudFrame, FfiTransportRequest,
+    FfiTransportResponseMode,
 };
 use crate::runtime::loader::EngineLibrary;
+use crate::transport::{TransportRequest, TransportResponseMode};
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
 
 /// 엔진이 제공하는 동적 제어/설정 API(Extension API) 메타데이터
@@ -258,6 +261,68 @@ impl FfiEngineAdapter {
 
         Ok(output)
     }
+
+    pub fn pop_transport_request(&mut self) -> io::Result<Option<TransportRequest>> {
+        let Some(has_fn) = self.library.has_transport_request else {
+            return Ok(None);
+        };
+
+        let Some(pop_fn) = self.library.pop_transport_request else {
+            return Ok(None);
+        };
+
+        let Some(free_fn) = self.library.free_transport_request else {
+            return Ok(None);
+        };
+
+        let has_request = unsafe { has_fn(self.handle) };
+
+        if !has_request {
+            return Ok(None);
+        }
+
+        let mut ffi_request = FfiTransportRequest {
+            data_ptr: std::ptr::null_mut(),
+            data_len: 0,
+            response_mode: FfiTransportResponseMode::None,
+            response_count: 0,
+        };
+
+        let status = unsafe { pop_fn(self.handle, &mut ffi_request) };
+
+        if status != FFI_STATUS_OK {
+            return Ok(None);
+        }
+
+        let response_mode = match ffi_request.response_mode {
+            FfiTransportResponseMode::None => TransportResponseMode::None,
+            FfiTransportResponseMode::One => TransportResponseMode::One,
+            FfiTransportResponseMode::Count => {
+                TransportResponseMode::Count(ffi_request.response_count)
+            }
+            FfiTransportResponseMode::UntilTimeout => TransportResponseMode::UntilTimeout,
+        };
+
+        let data = if ffi_request.data_ptr.is_null() || ffi_request.data_len == 0 {
+            bytes::Bytes::new()
+        } else {
+            unsafe {
+                bytes::Bytes::copy_from_slice(std::slice::from_raw_parts(
+                    ffi_request.data_ptr,
+                    ffi_request.data_len,
+                ))
+            }
+        };
+
+        unsafe {
+            free_fn(&mut ffi_request);
+        }
+
+        Ok(Some(TransportRequest {
+            data,
+            response_mode,
+        }))
+    }
 }
 
 // FfiEngineAdapter가 스레드 간에 이동해도 안전함을 컴파일러에게 강제로 알려줍니다.
@@ -268,16 +333,43 @@ impl Engine for FfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
-        self.process_packet(&chunk, sender_addr)
-            .unwrap_or_else(|error| {
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> EngineProcessResult {
+        EngineProcessResult::from_frames(self.process_packet(&chunk, sender_addr).unwrap_or_else(
+            |error| {
                 tracing::error!(
                     "Error processing packet in FfiEngineAdapter [{}]: {}",
                     self.id,
                     error
                 );
                 Vec::new()
-            })
+            },
+        ))
+    }
+
+    fn shutdown_payload(&self) -> Option<Bytes> {
+        let get_fn = self.library.get_shutdown_payload?;
+
+        let mut buffer = std::mem::MaybeUninit::<FfiApiBuffer>::uninit();
+        let status = unsafe { get_fn(self.handle, buffer.as_mut_ptr()) };
+
+        if status != FFI_STATUS_OK {
+            return None;
+        }
+
+        let mut buffer = unsafe { buffer.assume_init() };
+
+        if buffer.data_ptr.is_null() || buffer.data_len == 0 {
+            unsafe { (self.library.free_api_buffer)(&mut buffer) };
+            return None;
+        }
+
+        let data = unsafe {
+            Bytes::copy_from_slice(std::slice::from_raw_parts(buffer.data_ptr, buffer.data_len))
+        };
+
+        unsafe { (self.library.free_api_buffer)(&mut buffer) };
+
+        Some(data)
     }
 }
 
@@ -307,12 +399,31 @@ impl Engine for SharedFfiEngineAdapter {
         &self.id
     }
 
-    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> Vec<PointCloudFrame> {
+    fn process(&mut self, chunk: Bytes, sender_addr: std::net::SocketAddr) -> EngineProcessResult {
         tokio::task::block_in_place(|| match self.inner.lock() {
             Ok(mut adapter) => adapter.process(chunk, sender_addr),
             Err(error) => {
                 tracing::error!("failed to lock ffi engine adapter: {error}");
-                Vec::new()
+                EngineProcessResult::empty()
+            }
+        })
+    }
+
+    fn pop_transport_request(&mut self) -> io::Result<Option<TransportRequest>> {
+        tokio::task::block_in_place(|| match self.inner.lock() {
+            Ok(mut adapter) => adapter.pop_transport_request(),
+            Err(error) => Err(io::Error::other(format!(
+                "failed to lock ffi engine adapter: {error}"
+            ))),
+        })
+    }
+
+    fn shutdown_payload(&self) -> Option<Bytes> {
+        tokio::task::block_in_place(|| match self.inner.lock() {
+            Ok(adapter) => adapter.shutdown_payload(),
+            Err(error) => {
+                tracing::error!("failed to lock ffi engine adapter for shutdown_payload: {error}");
+                None
             }
         })
     }

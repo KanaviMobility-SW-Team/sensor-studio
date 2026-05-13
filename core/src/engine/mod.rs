@@ -1,11 +1,28 @@
+use std::io;
 use std::net::SocketAddr;
 
 use bytes::Bytes;
 
+use crate::transport::TransportRequest;
 use crate::types::PointCloudFrame;
 
 /// 엔진 고유 식별자
 pub type EngineId = String;
+
+#[derive(Debug, Default)]
+pub struct EngineProcessResult {
+    pub frames: Vec<PointCloudFrame>,
+}
+
+impl EngineProcessResult {
+    pub fn from_frames(frames: Vec<PointCloudFrame>) -> Self {
+        Self { frames }
+    }
+
+    pub fn empty() -> Self {
+        Self::default()
+    }
+}
 
 /// 센서 데이터 파싱을 담당하는 C-FFI 플러그인 통신 인터페이스
 pub trait Engine: Send {
@@ -13,5 +30,15 @@ pub trait Engine: Send {
     fn id(&self) -> &str;
 
     /// 수신된 바이트 청크와 송신지 IP(`sender_addr`)를 바탕으로 PointCloud 데이터 변환
-    fn process(&mut self, chunk: Bytes, sender_addr: SocketAddr) -> Vec<PointCloudFrame>;
+    fn process(&mut self, chunk: Bytes, sender_addr: SocketAddr) -> EngineProcessResult;
+
+    fn pop_transport_request(&mut self) -> io::Result<Option<TransportRequest>> {
+        Ok(None)
+    }
+
+    /// 종료 시 transport로 전송할 엔진 고유 페이로드 반환
+    /// `engine_get_shutdown_payload` FFI 심볼을 제공하는 경우 유효
+    fn shutdown_payload(&self) -> Option<Bytes> {
+        None
+    }
 }
