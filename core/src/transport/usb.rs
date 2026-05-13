@@ -54,7 +54,7 @@ impl UsbTransport {
             transact_timeout_ms: config.transact_timeout_ms,
         };
 
-        let mut handle =
+        let handle =
             rusb::open_device_with_vid_pid(parsed_config.vendor_id, parsed_config.product_id)
                 .ok_or_else(|| {
                     io::Error::new(
@@ -119,11 +119,12 @@ impl Transport for UsbTransport {
 
     fn read_chunk(&mut self) -> TransportFuture<'_, Option<TransportChunk>> {
         Box::pin(async move {
-            let read_size = match self.handle.read_bulk(
-                self.config.endpoint_in,
-                &mut self.buffer,
-                self.read_timeout,
-            ) {
+            let result = tokio::task::block_in_place(|| {
+                self.handle
+                    .read_bulk(self.config.endpoint_in, &mut self.buffer, self.read_timeout)
+            });
+
+            let read_size = match result {
                 Ok(size) => size,
                 Err(rusb::Error::Timeout) => {
                     return Ok(None);
@@ -155,78 +156,80 @@ impl Transport for UsbTransport {
         request: TransportRequest,
     ) -> TransportFuture<'_, Vec<TransportChunk>> {
         Box::pin(async move {
-            let written = self
-                .handle
-                .write_bulk(
-                    self.config.endpoint_out,
-                    &request.data,
-                    self.transact_timeout,
-                )
-                .map_err(|error| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("USB bulk write failed: {error}"),
+            tokio::task::block_in_place(|| {
+                let written = self
+                    .handle
+                    .write_bulk(
+                        self.config.endpoint_out,
+                        &request.data,
+                        self.transact_timeout,
                     )
-                })?;
-
-            if written != request.data.len() {
-                return Err(io::Error::new(
-                    io::ErrorKind::WriteZero,
-                    format!(
-                        "USB bulk write incomplete: written={}, expected={}",
-                        written,
-                        request.data.len()
-                    ),
-                ));
-            }
-
-            let expected_response_count = match request.response_mode {
-                TransportResponseMode::None => {
-                    return Ok(Vec::new());
-                }
-                TransportResponseMode::One => Some(1),
-                TransportResponseMode::Count(count) => Some(count),
-                TransportResponseMode::UntilTimeout => None,
-            };
-
-            let mut responses = Vec::new();
-
-            loop {
-                if let Some(expected_count) = expected_response_count {
-                    if responses.len() >= expected_count {
-                        break;
-                    }
-                }
-
-                let read_size = match self.handle.read_bulk(
-                    self.config.endpoint_in,
-                    &mut self.buffer,
-                    self.transact_timeout,
-                ) {
-                    Ok(size) => size,
-                    Err(rusb::Error::Timeout) => {
-                        break;
-                    }
-                    Err(error) => {
-                        return Err(io::Error::new(
+                    .map_err(|error| {
+                        io::Error::new(
                             io::ErrorKind::Other,
-                            format!("USB bulk read response failed: {error}"),
-                        ));
+                            format!("USB bulk write failed: {error}"),
+                        )
+                    })?;
+
+                if written != request.data.len() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        format!(
+                            "USB bulk write incomplete: written={}, expected={}",
+                            written,
+                            request.data.len()
+                        ),
+                    ));
+                }
+
+                let expected_response_count = match request.response_mode {
+                    TransportResponseMode::None => {
+                        return Ok(Vec::new());
                     }
+                    TransportResponseMode::One => Some(1),
+                    TransportResponseMode::Count(count) => Some(count),
+                    TransportResponseMode::UntilTimeout => None,
                 };
 
-                if read_size == 0 {
-                    break;
+                let mut responses = Vec::new();
+
+                loop {
+                    if let Some(expected_count) = expected_response_count {
+                        if responses.len() >= expected_count {
+                            break;
+                        }
+                    }
+
+                    let read_size = match self.handle.read_bulk(
+                        self.config.endpoint_in,
+                        &mut self.buffer,
+                        self.transact_timeout,
+                    ) {
+                        Ok(size) => size,
+                        Err(rusb::Error::Timeout) => {
+                            break;
+                        }
+                        Err(error) => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("USB bulk read response failed: {error}"),
+                            ));
+                        }
+                    };
+
+                    if read_size == 0 {
+                        break;
+                    }
+
+                    responses.push(TransportChunk {
+                        source_addr: self.synthetic_source_addr(),
+                        source_id: self.source_id(),
+                        data: Bytes::copy_from_slice(&self.buffer[..read_size]),
+                    });
                 }
 
-                responses.push(TransportChunk {
-                    source_addr: self.synthetic_source_addr(),
-                    source_id: self.source_id(),
-                    data: Bytes::copy_from_slice(&self.buffer[..read_size]),
-                });
-            }
-
-            Ok(responses)
+                Ok(responses)
+            })
         })
     }
 }

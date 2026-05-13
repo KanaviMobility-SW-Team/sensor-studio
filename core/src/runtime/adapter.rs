@@ -345,6 +345,32 @@ impl Engine for FfiEngineAdapter {
             },
         ))
     }
+
+    fn shutdown_payload(&self) -> Option<Bytes> {
+        let get_fn = self.library.get_shutdown_payload?;
+
+        let mut buffer = std::mem::MaybeUninit::<FfiApiBuffer>::uninit();
+        let status = unsafe { get_fn(self.handle, buffer.as_mut_ptr()) };
+
+        if status != FFI_STATUS_OK {
+            return None;
+        }
+
+        let mut buffer = unsafe { buffer.assume_init() };
+
+        if buffer.data_ptr.is_null() || buffer.data_len == 0 {
+            unsafe { (self.library.free_api_buffer)(&mut buffer) };
+            return None;
+        }
+
+        let data = unsafe {
+            Bytes::copy_from_slice(std::slice::from_raw_parts(buffer.data_ptr, buffer.data_len))
+        };
+
+        unsafe { (self.library.free_api_buffer)(&mut buffer) };
+
+        Some(data)
+    }
 }
 
 impl Drop for FfiEngineAdapter {
@@ -389,6 +415,16 @@ impl Engine for SharedFfiEngineAdapter {
             Err(error) => Err(io::Error::other(format!(
                 "failed to lock ffi engine adapter: {error}"
             ))),
+        })
+    }
+
+    fn shutdown_payload(&self) -> Option<Bytes> {
+        tokio::task::block_in_place(|| match self.inner.lock() {
+            Ok(adapter) => adapter.shutdown_payload(),
+            Err(error) => {
+                tracing::error!("failed to lock ffi engine adapter for shutdown_payload: {error}");
+                None
+            }
         })
     }
 }

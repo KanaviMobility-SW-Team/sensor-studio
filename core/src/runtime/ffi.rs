@@ -129,3 +129,8 @@ pub type EnginePopTransportRequestFn =
     unsafe extern "C" fn(handle: EngineHandle, out_request: *mut FfiTransportRequest) -> i32;
 
 pub type EngineFreeTransportRequestFn = unsafe extern "C" fn(request: *mut FfiTransportRequest);
+
+/// 종료 시 transport로 전송할 페이로드 조회
+/// 반환값 0: 유효 페이로드, 그 외: 전송 불필요
+pub type EngineGetShutdownPayloadFn =
+    unsafe extern "C" fn(handle: EngineHandle, out_buffer: *mut FfiApiBuffer) -> i32;

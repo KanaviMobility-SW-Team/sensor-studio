@@ -7,7 +7,7 @@
 use std::io;
 
 use crate::engine::Engine;
-use crate::transport::Transport;
+use crate::transport::{Transport, TransportRequest, TransportResponseMode};
 use crate::types::PointCloudFrame;
 
 /// 인스턴스 고유 식별자
@@ -71,12 +71,6 @@ impl Instance {
     /// 처리할 request가 없으면 transport에서 일반 수신 청크를 읽어 엔진에 전달한다.
     pub async fn run_once(&mut self) -> io::Result<Vec<PointCloudFrame>> {
         if let Some(request) = self.engine.pop_transport_request()? {
-            tracing::info!(
-                "Instance '{}' processing transport request payload size {} bytes",
-                self.id,
-                request.data.len()
-            );
-
             let responses = self.transport.transact_chunk(request).await?;
             let mut frames = Vec::new();
 
@@ -105,6 +99,25 @@ impl Instance {
                 tracing::info!("Instance '{}' state changed to {:?}", self.id, state);
             }
             self.state = state;
+        }
+    }
+
+    /// transport shutdown 패킷 전송 (엔진이 shutdown_payload를 제공하는 경우)
+    pub async fn shutdown(&mut self) {
+        if let Some(payload) = self.engine.shutdown_payload() {
+            let request = TransportRequest {
+                data: payload,
+                response_mode: TransportResponseMode::None,
+            };
+
+            tracing::info!("Instance '{}' sending shutdown payload", self.id);
+
+            if let Err(error) = self.transport.transact_chunk(request).await {
+                tracing::warn!(
+                    "Instance '{}' failed to send shutdown payload: {error}",
+                    self.id
+                );
+            }
         }
     }
 }

@@ -2,9 +2,9 @@ use libloading::Library;
 
 use crate::runtime::ffi::{
     EngineCallApiFn, EngineCreateFn, EngineDestroyFn, EngineFreeApiBufferFn, EngineFreeFrameFn,
-    EngineFreeTransportRequestFn, EngineGetApiCountFn, EngineGetApiInfoFn, EngineGetVersionFn,
-    EngineHasFrameFn, EngineHasTransportRequestFn, EnginePopFrameFn, EnginePopTransportRequestFn,
-    EngineProcessPacketFn, EngineSetLoggerFn,
+    EngineFreeTransportRequestFn, EngineGetApiCountFn, EngineGetApiInfoFn,
+    EngineGetShutdownPayloadFn, EngineGetVersionFn, EngineHasFrameFn, EngineHasTransportRequestFn,
+    EnginePopFrameFn, EnginePopTransportRequestFn, EngineProcessPacketFn, EngineSetLoggerFn,
 };
 
 /// 외부 공유 라이브러리 핸들 및 FFI 함수 포인터 구조체
@@ -25,6 +25,7 @@ pub struct EngineLibrary {
     pub has_transport_request: Option<EngineHasTransportRequestFn>,
     pub pop_transport_request: Option<EnginePopTransportRequestFn>,
     pub free_transport_request: Option<EngineFreeTransportRequestFn>,
+    pub get_shutdown_payload: Option<EngineGetShutdownPayloadFn>,
 }
 
 impl EngineLibrary {
@@ -73,6 +74,13 @@ impl EngineLibrary {
                 .map(|symbol| *symbol)
         };
 
+        let get_shutdown_payload = unsafe {
+            library
+                .get::<EngineGetShutdownPayloadFn>(b"engine_get_shutdown_payload")
+                .ok()
+                .map(|symbol| *symbol)
+        };
+
         Ok(Self {
             _library: library,
             create,
@@ -90,6 +98,7 @@ impl EngineLibrary {
             has_transport_request,
             pop_transport_request,
             free_transport_request,
+            get_shutdown_payload,
         })
     }
 }

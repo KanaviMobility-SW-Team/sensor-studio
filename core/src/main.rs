@@ -13,6 +13,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
@@ -160,11 +161,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Sensor Studio Core daemon started (WS: {})", ws_bind_addr);
 
+    let token = CancellationToken::new();
+    let mut handles = Vec::new();
+
     for instance_config in runtime_config.instances {
         let sender = sender.clone();
         let extension_registry = extension_registry.clone();
+        let token = token.clone();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let publish_source_id = instance_config.channel.source_id.clone();
 
             let shared = match extension_registry.get(&instance_config.instance_id) {
@@ -211,37 +216,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut backoff = std::time::Duration::from_millis(100);
 
             loop {
-                match instance.run_once().await {
-                    Ok(frames) => {
-                        if instance.state == InstanceState::Error {
-                            tracing::info!(
-                                "Instance '{}' recovered from runtime error",
-                                instance.id
-                            );
-                            backoff = std::time::Duration::from_millis(100);
-                        }
-                        instance.set_state(InstanceState::Running);
+                tokio::select! {
+                    result = instance.run_once() => {
+                        match result {
+                            Ok(frames) => {
+                                if instance.state == InstanceState::Error {
+                                    tracing::info!(
+                                        "Instance '{}' recovered from runtime error",
+                                        instance.id
+                                    );
+                                    backoff = std::time::Duration::from_millis(100);
+                                }
+                                instance.set_state(InstanceState::Running);
 
-                        for frame in frames {
-                            publisher.publish(frame);
+                                for frame in frames {
+                                    publisher.publish(frame);
+                                }
+                            }
+                            Err(error) => {
+                                instance.set_state(InstanceState::Error);
+                                tracing::error!(
+                                    "Runtime loop error for instance '{}': {error}, retrying in {:?}",
+                                    instance.id,
+                                    backoff
+                                );
+                                tokio::time::sleep(backoff).await;
+                                backoff = (backoff * 2).min(MAX_BACKOFF);
+                            }
                         }
                     }
-                    Err(error) => {
-                        instance.set_state(InstanceState::Error);
-                        tracing::error!(
-                            "Runtime loop error for instance '{}': {error}, retrying in {:?}",
-                            instance.id,
-                            backoff
-                        );
-                        tokio::time::sleep(backoff).await;
-                        backoff = (backoff * 2).min(MAX_BACKOFF);
+                    _ = token.cancelled() => {
+                        tracing::info!("Instance '{}' received shutdown signal", instance.id);
+                        break;
                     }
                 }
             }
+
+            instance.shutdown().await;
         });
+
+        handles.push(handle);
     }
 
     tokio::signal::ctrl_c().await?;
+    token.cancel();
     tracing::info!("Received Ctrl-C, gracefully shutting down Sensor Studio Core");
+
+    for handle in handles {
+        let _ = handle.await;
+    }
+
     Ok(())
 }

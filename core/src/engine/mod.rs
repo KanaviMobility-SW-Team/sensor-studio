@@ -35,4 +35,10 @@ pub trait Engine: Send {
     fn pop_transport_request(&mut self) -> io::Result<Option<TransportRequest>> {
         Ok(None)
     }
+
+    /// 종료 시 transport로 전송할 엔진 고유 페이로드 반환
+    /// `engine_get_shutdown_payload` FFI 심볼을 제공하는 경우 유효
+    fn shutdown_payload(&self) -> Option<Bytes> {
+        None
+    }
 }
