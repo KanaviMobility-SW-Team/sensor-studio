@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_multiplatform_logger/flutter_multiplatform_logger.dart';
+
+void main() async {
+  await FlutterMultiplatformLogger.init();
+  Logger('Main').info('Application started!');
+
   runApp(const ProviderScope(child: SensorStudioApp()));
 }
 

@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.3.1
   riverpod_annotation: ^4.0.2
+  web_socket_channel: ^3.0.3
+  flutter_multiplatform_logger: ^1.0.0
 
 dev_dependencies:
   flutter_test:
