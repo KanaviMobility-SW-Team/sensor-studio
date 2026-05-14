@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_multiplatform_logger/flutter_multiplatform_logger.dart';
-
-import 'package:ui/widgets/layout/bottom_console.dart';
-import 'package:ui/widgets/layout/sensor_sidebar.dart';
+import 'package:ui/screens/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,18 +21,7 @@ class SensorStudioApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sensor-Studio',
       theme: ThemeData.dark(), // 기본적으로 어두운 테마 사용
-      home: Scaffold(
-        body: Center(
-          child: Column(
-            children: [
-              Expanded(
-                child: Row(children: [const SensorSidebar(), const Spacer()]),
-              ),
-              Expanded(child: BottomConsole()),
-            ],
-          ),
-        ), // 임시 화면
-      ),
+      home: const DashboardScreen(),
     );
   }
 }
