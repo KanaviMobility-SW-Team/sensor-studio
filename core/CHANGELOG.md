@@ -2,6 +2,27 @@
 
 All notable changes to the `sensor-studio-core` project will be documented in this file.
 
+## [v0.2.0] - 2026-05-14
+
+### Features
+* **USB Transport 구현**: `rusb` 기반의 USB Bulk Read/Write 기능을 추가하여 Wide-30m ToF 등 USB 기반 장치 지원 확장.
+* **Graceful Shutdown 및 CancellationToken 도입**: 시스템 종료 시 인스턴스 및 엔진의 안전한 종료(Join)를 보장하는 프로세스 구현.
+* **Transport Request/Response 인터페이스 확장**: FFI 경로를 통한 엔진-코어 간 양방향 통신(Polling) 및 Shutdown Payload 전송 기능 추가.
+* **USB 설정 모델링**: vendor/product ID 및 endpoint 설정을 위한 전용 구조체 정의 및 16진수 문자열 파싱 로직 반영.
+
+### Improvements
+* **Transport 계층 추상화**: 인스턴스 실행 경로에서 특정 구체 타입 대신 공통 `Transport` Trait 객체를 사용하도록 구조 일반화.
+* **비동기 워커 블로킹 방지**: USB I/O 등 Blocking 작업 구간을 `block_in_place`로 격리하여 런타임 스케줄러 안정성 확보.
+* **ID 체계 통합**: UDP/USB 구분 없이 `instance_id`를 기반으로 한 단일 Transport 식별 및 관리 체계로 정리.
+* **설계 구조 개선**: Runtime Factory가 설정에 따라 UDP/USB Transport를 동적으로 생성하여 주입하도록 로직 고도화.
+
+### Fixes
+* **런타임 루프 안정성 강화**: 단일 사이클 내 처리 가능한 Transport 요청 수 제한을 통해 잠재적인 무한 루프 및 점유 방지.
+* **로그 노이즈 제거 및 포맷 최적화**: 불필요한 로그 출력 제거 및 USB 소스 ID의 16진수 표기 표준화.
+* **설정 검증 로직 보강**: 미구현된 USB 설정 항목에 대해 초기화 단계에서 명확한 실패(Fail-fast)를 반환하도록 수정.
+
+---
+
 ## [v0.1.0] - 2026-04-22
 
 ### Initial Release
