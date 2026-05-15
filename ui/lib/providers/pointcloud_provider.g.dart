@@ -41,7 +41,7 @@ final class PointCloudDataProvider
   }
 }
 
-String _$pointCloudDataHash() => r'aa4a223adee14987e13560759a20143842362226';
+String _$pointCloudDataHash() => r'64a7018a1e931ef381d77ff2e6c6424e30692d82';
 
 abstract class _$PointCloudData
     extends $Notifier<Map<String, List<PointData>>> {
