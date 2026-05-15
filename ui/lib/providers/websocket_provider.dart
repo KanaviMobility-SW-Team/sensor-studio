@@ -1,18 +1,60 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:logging/logging.dart';
+
+import 'package:ui/providers/sensor_provider.dart';
 
 part 'websocket_provider.g.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, error }
 
+class FoxgloveChannel {
+  final int id;
+  final String topic;
+  final String encoding;
+  final String schemaName;
+
+  FoxgloveChannel({
+    required this.id,
+    required this.topic,
+    required this.encoding,
+    required this.schemaName,
+  });
+
+  factory FoxgloveChannel.fromJson(Map<String, dynamic> json) {
+    return FoxgloveChannel(
+      id: json['id'] as int,
+      topic: json['topic'] as String,
+      encoding: json['encoding'] as String,
+      schemaName: json['schemaName'] as String,
+    );
+  }
+}
+
 class WebSocketState {
   final ConnectionStatus status;
+  final Map<String, FoxgloveChannel> availableChannels;
+  final Map<String, int> activeSubscriptions; // topic -> subscription_id
 
-  WebSocketState({required this.status});
+  WebSocketState({
+    required this.status,
+    this.availableChannels = const {},
+    this.activeSubscriptions = const {},
+  });
 
-  WebSocketState copyWith({ConnectionStatus? status}) {
-    return WebSocketState(status: status ?? this.status);
+  WebSocketState copyWith({
+    ConnectionStatus? status,
+    Map<String, FoxgloveChannel>? availableChannels,
+    Map<String, int>? activeSubscriptions,
+  }) {
+    return WebSocketState(
+      status: status ?? this.status,
+      availableChannels: availableChannels ?? this.availableChannels,
+      activeSubscriptions: activeSubscriptions ?? this.activeSubscriptions,
+    );
   }
 }
 
@@ -20,12 +62,14 @@ class WebSocketState {
 class WebSocketManager extends _$WebSocketManager {
   WebSocketChannel? _channel;
   final _log = Logger('WebSocketManager');
+  int _nextSubscriptionId = 1; // Foxglove 구독 ID 발급용
 
   @override
   WebSocketState build() {
     return WebSocketState(status: ConnectionStatus.disconnected);
   }
 
+  // WebSocket 서버에 연결하는 함수
   void connect(String url) {
     if (state.status == ConnectionStatus.connected) return;
 
@@ -36,16 +80,8 @@ class WebSocketManager extends _$WebSocketManager {
       _channel = WebSocketChannel.connect(Uri.parse(url));
 
       _channel!.stream.listen(
-        (message) {
-          if (state.status != ConnectionStatus.connected) {
-            state = state.copyWith(status: ConnectionStatus.connected);
-            _log.info('WebSocket Connected Successfully!');
-          }
-        },
-        onDone: () {
-          state = state.copyWith(status: ConnectionStatus.disconnected);
-          _log.info('WebSocket connection closed.');
-        },
+        (message) => _handleMessage(message),
+        onDone: () => _handleDisconnect(),
         onError: (error) {
           state = state.copyWith(status: ConnectionStatus.error);
           _log.severe('WebSocket Error: $error');
@@ -57,10 +93,124 @@ class WebSocketManager extends _$WebSocketManager {
     }
   }
 
+  // 메시지 분류 및 처리 로직
+  void _handleMessage(dynamic message) {
+    if (state.status != ConnectionStatus.connected) {
+      state = state.copyWith(status: ConnectionStatus.connected);
+      _log.info('WebSocket Connected Successfully!');
+    }
+
+    if (message is String) {
+      try {
+        final data = jsonDecode(message);
+        final op = data['op'];
+
+        if (op == 'serverInfo') {
+          _log.info('Server Info: ${data['name']}');
+        } else if (op == 'advertise') {
+          _handleAdvertise(data['channels'] as List);
+        }
+      } catch (e) {
+        _log.warning('Failed to parse JSON control message: $e');
+      }
+    } else if (message is Uint8List || message is List<int>) {
+      _log.fine('Received binary message of length ${message.length}');
+    }
+  }
+
+  // advertise 메시지에서 채널 목록 파악
+  void _handleAdvertise(List<dynamic> channelsList) {
+    final newChannels = Map<String, FoxgloveChannel>.from(
+      state.availableChannels,
+    );
+
+    for (var ch in channelsList) {
+      final channel = FoxgloveChannel.fromJson(ch as Map<String, dynamic>);
+      // 토픽 이름(예: lidar_roof)을 키로 저장
+      newChannels[channel.topic] = channel;
+      _log.info(
+        'Advertised Topic: ${channel.topic} [ID: ${channel.id}, Schema: ${channel.schemaName}]',
+      );
+    }
+
+    state = state.copyWith(availableChannels: newChannels);
+
+    // 센서 리스트에 토픽들 동기화
+    ref
+        .read(sensorListProvider.notifier)
+        .syncSensors(newChannels.keys.toList());
+  }
+
+  // 사이드바에서 센서를 켰을 때 호출할 구독 함수
+  void toggleSubscription(String topic, bool subscribe) {
+    if (_channel == null || state.status != ConnectionStatus.connected) {
+      _log.warning('Cannot subscribe to $topic: WebSocket disconnected.');
+      return;
+    }
+
+    final channelInfo = state.availableChannels[topic];
+    if (channelInfo == null) {
+      _log.warning(
+        'Cannot subscribe to $topic: Topic not advertised by Core yet.',
+      );
+      return;
+    }
+
+    if (subscribe) {
+      // 이미 구독 중이면 무시
+      if (state.activeSubscriptions.containsKey(topic)) return;
+
+      final subId = _nextSubscriptionId++;
+      final command = jsonEncode({
+        "op": "subscribe",
+        "subscriptions": [
+          {"id": subId, "channelId": channelInfo.id},
+        ],
+      });
+
+      _channel!.sink.add(command);
+      _log.info(
+        'Sent subscribe command for $topic (SubID: $subId, ChID: ${channelInfo.id})',
+      );
+
+      final newSubs = Map<String, int>.from(state.activeSubscriptions)
+        ..[topic] = subId;
+      state = state.copyWith(activeSubscriptions: newSubs);
+    } else {
+      // 구독 해제 로직
+      final subId = state.activeSubscriptions[topic];
+      if (subId == null) return;
+
+      final command = jsonEncode({
+        "op": "unsubscribe",
+        "subscriptionIds": [subId],
+      });
+
+      _channel!.sink.add(command);
+      _log.info('Sent unsubscribe command for $topic (SubID: $subId)');
+
+      final newSubs = Map<String, int>.from(state.activeSubscriptions)
+        ..remove(topic);
+      state = state.copyWith(activeSubscriptions: newSubs);
+    }
+  }
+
+  void _handleDisconnect() {
+    state = state.copyWith(
+      status: ConnectionStatus.disconnected,
+      availableChannels: {},
+      activeSubscriptions: {},
+    );
+    _log.info('WebSocket connection closed.');
+    _channel = null;
+
+    // 센서 리스트 초기화
+    ref.read(sensorListProvider.notifier).syncSensors([]);
+  }
+
   void disconnect() {
     _log.info('Disconnecting by user request...');
     _channel?.sink.close();
-    _channel = null;
-    state = state.copyWith(status: ConnectionStatus.disconnected);
+    _handleDisconnect();
   }
 }

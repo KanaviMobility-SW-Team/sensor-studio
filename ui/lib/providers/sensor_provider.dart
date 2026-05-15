@@ -4,6 +4,7 @@ part 'sensor_provider.g.dart';
 
 class SensorConfig {
   final String name;
+  final String displayName;
   final bool isVisible;
   final double pointSize;
   final double opacity;
@@ -12,12 +13,34 @@ class SensorConfig {
 
   SensorConfig({
     required this.name,
-    this.isVisible = true,
+    this.displayName = "",
+    this.isVisible = false,
     this.pointSize = 2.0,
     this.opacity = 1.0,
     this.colorField = 'intensity',
     this.colorMap = 'turbo',
   });
+
+  factory SensorConfig.fromTopic(
+    String topic, {
+    bool isVisible = false,
+    double pointSize = 2.0,
+    double opacity = 1.0,
+    String colorField = 'intensity',
+    String colorMap = 'turbo',
+  }) {
+    final displayName = topic.split('/').last;
+
+    return SensorConfig(
+      name: topic,
+      displayName: displayName,
+      isVisible: isVisible,
+      pointSize: pointSize,
+      opacity: opacity,
+      colorField: colorField,
+      colorMap: colorMap,
+    );
+  }
 
   // 상태 업데이트를 위한 copyWith 메서드
   SensorConfig copyWith({
@@ -28,8 +51,11 @@ class SensorConfig {
     String? colorField,
     String? colorMap,
   }) {
+    final displayName = this.name.split('/').last;
+
     return SensorConfig(
       name: name ?? this.name,
+      displayName: displayName,
       isVisible: isVisible ?? this.isVisible,
       pointSize: pointSize ?? this.pointSize,
       opacity: opacity ?? this.opacity,
@@ -43,12 +69,26 @@ class SensorConfig {
 class SensorList extends _$SensorList {
   @override
   List<SensorConfig> build() {
-    // 앱 실행 시 최초로 세팅되는 센서 리스트 (초기 상태)
-    return [
-      SensorConfig(name: 'lidar_roof'),
-      SensorConfig(name: 'lidar_bumper'),
-      SensorConfig(name: 'radar_front'),
-    ];
+    return [];
+  }
+
+  void syncSensors(List<String> advertisedTopics) {
+    final currentSensors = state;
+    final List<SensorConfig> updatedList = [];
+
+    for (final topic in advertisedTopics) {
+      final existing = currentSensors.where((s) => s.name == topic).firstOrNull;
+
+      if (existing != null) {
+        // 이미 리스트에 있는 센서(토픽)라면 기존 설정(투명도, 크기 등)을 그대로 유지
+        updatedList.add(existing);
+      } else {
+        // 새로 발견된 토픽이라면 기본 설정으로 추가 (기본적으로 시각화 Off 상태로 추가)
+        updatedList.add(SensorConfig.fromTopic(topic));
+      }
+    }
+
+    state = updatedList;
   }
 
   // --- 상태 변경 메서드들 ---

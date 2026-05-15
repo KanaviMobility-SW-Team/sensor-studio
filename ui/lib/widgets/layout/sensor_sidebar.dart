@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ui/providers/websocket_provider.dart';
 import '../../providers/sensor_provider.dart';
 
 class SensorSidebar extends ConsumerWidget {
@@ -9,8 +10,8 @@ class SensorSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 프로바이더의 상태를 구독 (데이터가 바뀌면 자동 렌더링)
     final sensors = ref.watch(sensorListProvider);
+    final wsNotifier = ref.read(webSocketManagerProvider.notifier);
 
     return Container(
       width: 300,
@@ -42,6 +43,10 @@ class SensorSidebar extends ConsumerWidget {
                   leading: InkWell(
                     onTap: () {
                       notifier.toggleVisibility(sensor.name, !sensor.isVisible);
+                      wsNotifier.toggleSubscription(
+                        sensor.name,
+                        !sensor.isVisible,
+                      );
                     },
                     child: Icon(
                       sensor.isVisible
@@ -53,7 +58,7 @@ class SensorSidebar extends ConsumerWidget {
                     ),
                   ),
                   title: Text(
-                    sensor.name,
+                    sensor.displayName,
                     style: const TextStyle(color: Colors.white, fontSize: 15),
                   ),
                   childrenPadding: const EdgeInsets.symmetric(
