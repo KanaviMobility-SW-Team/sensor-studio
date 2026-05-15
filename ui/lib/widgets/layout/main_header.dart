@@ -1,10 +1,40 @@
 import 'package:flutter/material.dart';
 
-class MainHeader extends StatelessWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../providers/websocket_provider.dart';
+
+class MainHeader extends ConsumerWidget {
   const MainHeader({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 상태 구독
+    final wsState = ref.watch(webSocketManagerProvider);
+    final wsNotifier = ref.read(webSocketManagerProvider.notifier);
+
+    // 상태에 따른 UI 색상/텍스트 분기 처리
+    Color statusColor;
+    String statusText;
+
+    switch (wsState.status) {
+      case ConnectionStatus.connected:
+        statusColor = Colors.greenAccent;
+        statusText = 'Connected';
+        break;
+      case ConnectionStatus.connecting:
+        statusColor = Colors.orangeAccent;
+        statusText = 'Connecting...';
+        break;
+      case ConnectionStatus.error:
+        statusColor = Colors.red;
+        statusText = 'Error';
+        break;
+      default:
+        statusColor = Colors.redAccent;
+        statusText = 'Disconnected';
+    }
+
     return Container(
       height: 50,
       color: const Color(0xFF252526),
@@ -23,26 +53,31 @@ class MainHeader extends StatelessWidget {
           Container(
             width: 10,
             height: 10,
-            decoration: const BoxDecoration(
-              color: Colors.redAccent,
+            decoration: BoxDecoration(
+              color: statusColor,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 8),
-          const Text(
-            'Disconnected',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
+          Text(
+            statusText,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
           const SizedBox(width: 24),
           IconButton(
             icon: const Icon(Icons.play_arrow, size: 20),
-            onPressed: () {},
             color: Colors.greenAccent,
+            onPressed: () {
+              // 임시로 localhost 포트 8080 연결 시도
+              wsNotifier.connect('ws://localhost:8080/ws');
+            },
           ),
           IconButton(
             icon: const Icon(Icons.stop, size: 20),
-            onPressed: () {},
             color: Colors.redAccent,
+            onPressed: () {
+              wsNotifier.disconnect();
+            },
           ),
         ],
       ),
