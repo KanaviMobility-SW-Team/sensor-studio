@@ -592,6 +592,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  point_glass:
+    dependency: "direct main"
+    description:
+      name: point_glass
+      sha256: c347c8b4bcf8013a30c6430fc373072a378516d602e931ea1331a331149b4d73
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1"
   pool:
     dependency: transitive
     description:
@@ -805,8 +813,16 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
-  vector_math:
+  universal_platform:
     dependency: transitive
+    description:
+      name: universal_platform
+      sha256: "64e16458a0ea9b99260ceb5467a214c1f298d647c659af1bff6d3bf82536b1ec"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+  vector_math:
+    dependency: "direct main"
     description:
       name: vector_math
       sha256: d530bd74fea330e6e364cda7a85019c434070188383e1cd8d9777ee586914c5b
