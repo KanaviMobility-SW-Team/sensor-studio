@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:point_glass/point_glass.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
-class MainVisualizer extends StatefulWidget {
+import '../../providers/sensor_provider.dart';
+
+class MainVisualizer extends ConsumerStatefulWidget {
   const MainVisualizer({super.key});
 
   @override
-  State<MainVisualizer> createState() => _MainVisualizerState();
+  ConsumerState<MainVisualizer> createState() => _MainVisualizerState();
 }
 
-class _MainVisualizerState extends State<MainVisualizer> {
+class _MainVisualizerState extends ConsumerState<MainVisualizer> {
   late final ValueNotifier<ViewContext> _viewContext;
 
   @override
@@ -19,7 +22,7 @@ class _MainVisualizerState extends State<MainVisualizer> {
     _viewContext = ValueNotifier(
       ViewContext(
         model: ModelTransform(),
-        camera: PinholeCamera(cameraZ: 20), // 초기 카메라 거리 설정
+        camera: PinholeCamera(cameraZ: 20),
         proj: PinholeProjection(focalPx: 800, near: 1, far: 20000),
         canvasCenter: const Offset(0, 0),
       ),
@@ -34,15 +37,59 @@ class _MainVisualizerState extends State<MainVisualizer> {
 
   @override
   Widget build(BuildContext context) {
+    final sensors = ref.watch(sensorListProvider);
+
+    final pointsGroup = sensors.where((s) => s.isVisible).map((sensor) {
+      // 임시 더미 데이터 생성
+      List<vm.Vector3> dummyVectors;
+      Color baseColor;
+
+      if (sensor.name == 'lidar_roof') {
+        dummyVectors = [
+          vm.Vector3(0, 0, 5),
+          vm.Vector3(1, 0, 5),
+          vm.Vector3(0, 1, 5),
+          vm.Vector3(1, 1, 5),
+        ];
+        baseColor = Colors.redAccent;
+      } else if (sensor.name == 'lidar_bumper') {
+        dummyVectors = [
+          vm.Vector3(3, 0, 1),
+          vm.Vector3(4, 0, 1),
+          vm.Vector3(3, 1, 1),
+          vm.Vector3(4, 1, 1),
+        ];
+        baseColor = Colors.blueAccent;
+      } else {
+        // radar_front
+        dummyVectors = [
+          vm.Vector3(-3, 0, 2),
+          vm.Vector3(-4, 0, 2),
+          vm.Vector3(-3, 1, 2),
+          vm.Vector3(-4, 1, 2),
+        ];
+        baseColor = Colors.greenAccent;
+      }
+
+      final pointList = dummyVectors.map((v) {
+        return PointGlassPoint(
+          point: v,
+          strokeWidth: sensor.pointSize, // 사이드바의 Point Size 슬라이더 연동
+          alpha: (sensor.opacity * 255).toInt(), // 0.0~1.0 값을 0~255로 변환하여 연동
+          color: baseColor,
+        );
+      }).toList();
+
+      return PointGlassPoints(enable: true, points: pointList);
+    }).toList();
+
     return Expanded(
       child: Container(
-        color: const Color(0xFF121212), // 어두운 배경 유지
-        // ClipRect를 추가하여 영역 밖으로 렌더링되는 것을 방지
+        color: const Color(0xFF121212),
         child: ClipRect(
           child: PointGlassViewer(
             viewContext: _viewContext,
-            mode: PointGlassViewerMode.rotate, // 기본 마우스 동작: 회전
-            // 바닥 격자(Grid) 설정
+            mode: PointGlassViewerMode.rotate,
             grid: PointGlassGrid(
               enable: true,
               gridSize: 20,
@@ -50,60 +97,9 @@ class _MainVisualizerState extends State<MainVisualizer> {
               enableLabel: true,
               labelStyle: TextStyle(color: Colors.white.withAlpha(150)),
             ),
-
-            // X, Y, Z 축 표시
             axis: PointGlassAxis(enable: true, axisLength: 2.0),
-
-            // 테스트용 더미 포인트 클라우드 포인트
-            pointsGroup: [
-              PointGlassPoints(
-                enable: true,
-                points: [
-                  PointGlassPoint(
-                    point: vm.Vector3(0, 0, 0),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                  PointGlassPoint(
-                    point: vm.Vector3(0, 0, 0),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                  PointGlassPoint(
-                    point: vm.Vector3(1, 0, 0),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                  PointGlassPoint(
-                    point: vm.Vector3(0, 1, 0),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                  PointGlassPoint(
-                    point: vm.Vector3(0, 0, 1),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                  PointGlassPoint(
-                    point: vm.Vector3(2, 2, 2),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                  PointGlassPoint(
-                    point: vm.Vector3(-2, -2, -2),
-                    strokeWidth: 2,
-                    alpha: 200,
-                    color: Colors.yellow,
-                  ),
-                ],
-              ),
-            ],
+            // 동적으로 생성된 pointsGroup을 주입
+            pointsGroup: pointsGroup,
           ),
         ),
       ),
