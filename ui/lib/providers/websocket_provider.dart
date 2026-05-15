@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:ui/providers/sensor_provider.dart';
+import 'package:ui/providers/pointcloud_provider.dart';
 
 part 'websocket_provider.g.dart';
 
@@ -62,7 +63,7 @@ class WebSocketState {
 class WebSocketManager extends _$WebSocketManager {
   WebSocketChannel? _channel;
   final _log = Logger('WebSocketManager');
-  int _nextSubscriptionId = 1; // Foxglove 구독 ID 발급용
+  int _nextSubscriptionId = 1;
 
   @override
   WebSocketState build() {
@@ -114,7 +115,39 @@ class WebSocketManager extends _$WebSocketManager {
         _log.warning('Failed to parse JSON control message: $e');
       }
     } else if (message is Uint8List || message is List<int>) {
-      _log.fine('Received binary message of length ${message.length}');
+      final bytes = message is Uint8List
+          ? message
+          : Uint8List.fromList(message as List<int>);
+      if (bytes.isEmpty) return;
+
+      final op = bytes[0];
+
+      // Opcode 0x01: Message Data
+      if (op == 0x01) {
+        final byteData = ByteData.sublistView(bytes);
+
+        // 구조: [0x01] + [SubID(4)] + [Timestamp(8)] + [Payload]
+        final subId = byteData.getUint32(1, Endian.little);
+        final payloadBytes = bytes.sublist(13);
+
+        try {
+          final payloadStr = utf8.decode(payloadBytes);
+          final payloadJson = jsonDecode(payloadStr);
+
+          final topic = state.activeSubscriptions.entries
+              .where((e) => e.value == subId)
+              .map((e) => e.key)
+              .firstOrNull;
+
+          if (topic != null) {
+            ref
+                .read(pointCloudDataProvider.notifier)
+                .processPayload(topic, payloadJson);
+          }
+        } catch (e) {
+          _log.warning('Failed to parse binary payload: $e');
+        }
+      }
     }
   }
 

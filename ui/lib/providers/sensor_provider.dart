@@ -42,7 +42,6 @@ class SensorConfig {
     );
   }
 
-  // 상태 업데이트를 위한 copyWith 메서드
   SensorConfig copyWith({
     String? name,
     bool? isVisible,
@@ -91,7 +90,6 @@ class SensorList extends _$SensorList {
     state = updatedList;
   }
 
-  // --- 상태 변경 메서드들 ---
   void _updateSensor(String name, SensorConfig Function(SensorConfig) updater) {
     state = [
       for (final sensor in state)

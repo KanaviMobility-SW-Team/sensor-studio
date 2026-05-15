@@ -41,7 +41,7 @@ final class WebSocketManagerProvider
   }
 }
 
-String _$webSocketManagerHash() => r'7f36d3faf680b4ac0cde0490eed7a51db82362c3';
+String _$webSocketManagerHash() => r'79b92e81c4485a8331dfad28713a7e6b5fd3b08f';
 
 abstract class _$WebSocketManager extends $Notifier<WebSocketState> {
   WebSocketState build();

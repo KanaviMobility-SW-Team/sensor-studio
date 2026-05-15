@@ -83,7 +83,7 @@ class SensorSidebar extends ConsumerWidget {
                     _buildDropdown(
                       'Color Field',
                       sensor.colorField,
-                      ['intensity', 'z', 'ring'],
+                      ['intensity', 'z'],
                       (val) {
                         if (val != null) {
                           notifier.updateColorField(sensor.name, val);
@@ -93,7 +93,7 @@ class SensorSidebar extends ConsumerWidget {
                     _buildDropdown(
                       'Color Map',
                       sensor.colorMap,
-                      ['turbo', 'rainbow', 'viridis'],
+                      ['turbo', 'rainbow'],
                       (val) {
                         if (val != null) {
                           notifier.updateColorMap(sensor.name, val);

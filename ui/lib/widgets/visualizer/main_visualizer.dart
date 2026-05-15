@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:point_glass/point_glass.dart';
-import 'package:vector_math/vector_math.dart' as vm;
+import 'package:ui/providers/pointcloud_provider.dart';
 
 import '../../providers/sensor_provider.dart';
 
@@ -35,48 +35,75 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
     super.dispose();
   }
 
+  Color _mapValueToColor(
+    double value,
+    String colorMapType, {
+    double min = 0,
+    double max = 255,
+  }) {
+    // 값을 0.0 ~ 1.0 사이로 정규화
+    final normalized = ((value - min) / (max - min)).clamp(0.0, 1.0);
+
+    if (colorMapType == 'rainbow') {
+      final hue = (1.0 - normalized) * 240;
+      return HSVColor.fromAHSV(1.0, hue, 1.0, 1.0).toColor();
+    }
+
+    if (colorMapType == 'turbo') {
+      // Turbo colormap 근사 공식
+      const r = [0.18995, 0.5, 0.8, 1.0, 0.9, 0.5];
+      const g = [0.07176, 0.5, 0.9, 0.8, 0.3, 0.1];
+      const b = [0.23217, 0.9, 0.5, 0.1, 0.05, 0.0];
+
+      final idx = (normalized * (r.length - 1));
+      final lo = idx.floor().clamp(0, r.length - 2);
+      final t = idx - lo;
+
+      return Color.fromARGB(
+        255,
+        ((r[lo] + t * (r[lo + 1] - r[lo])) * 255).round(),
+        ((g[lo] + t * (g[lo + 1] - g[lo])) * 255).round(),
+        ((b[lo] + t * (b[lo + 1] - b[lo])) * 255).round(),
+      );
+    }
+
+    return Colors.white;
+  }
+
   @override
   Widget build(BuildContext context) {
     final sensors = ref.watch(sensorListProvider);
 
+    final pointCloudData = ref.watch(pointCloudDataProvider);
+
     final pointsGroup = sensors.where((s) => s.isVisible).map((sensor) {
-      // 임시 더미 데이터 생성
-      List<vm.Vector3> dummyVectors;
-      Color baseColor;
+      final realPoints = pointCloudData[sensor.name] ?? <PointData>[];
 
-      if (sensor.name == 'lidar_roof') {
-        dummyVectors = [
-          vm.Vector3(0, 0, 5),
-          vm.Vector3(1, 0, 5),
-          vm.Vector3(0, 1, 5),
-          vm.Vector3(1, 1, 5),
-        ];
-        baseColor = Colors.redAccent;
-      } else if (sensor.name == 'lidar_bumper') {
-        dummyVectors = [
-          vm.Vector3(3, 0, 1),
-          vm.Vector3(4, 0, 1),
-          vm.Vector3(3, 1, 1),
-          vm.Vector3(4, 1, 1),
-        ];
-        baseColor = Colors.blueAccent;
-      } else {
-        // radar_front
-        dummyVectors = [
-          vm.Vector3(-3, 0, 2),
-          vm.Vector3(-4, 0, 2),
-          vm.Vector3(-3, 1, 2),
-          vm.Vector3(-4, 1, 2),
-        ];
-        baseColor = Colors.greenAccent;
-      }
+      Color baseColor = Colors.white70;
 
-      final pointList = dummyVectors.map((v) {
+      final pointList = realPoints.map((p) {
+        Color pointColor = baseColor;
+        if (sensor.colorField == 'intensity') {
+          pointColor = _mapValueToColor(
+            p.attributes[sensor.colorField] ?? 0.0,
+            sensor.colorMap,
+            min: 0,
+            max: 12000,
+          );
+        } else if (sensor.colorField == 'z') {
+          pointColor = _mapValueToColor(
+            p.position.z,
+            sensor.colorMap,
+            min: -10.0,
+            max: 10.0,
+          );
+        }
+
         return PointGlassPoint(
-          point: v,
-          strokeWidth: sensor.pointSize, // 사이드바의 Point Size 슬라이더 연동
-          alpha: (sensor.opacity * 255).toInt(), // 0.0~1.0 값을 0~255로 변환하여 연동
-          color: baseColor,
+          point: p.position,
+          strokeWidth: sensor.pointSize,
+          alpha: (sensor.opacity * 255).toInt(),
+          color: pointColor,
         );
       }).toList();
 
@@ -98,7 +125,6 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
               labelStyle: TextStyle(color: Colors.white.withAlpha(150)),
             ),
             axis: PointGlassAxis(enable: true, axisLength: 2.0),
-            // 동적으로 생성된 pointsGroup을 주입
             pointsGroup: pointsGroup,
           ),
         ),
