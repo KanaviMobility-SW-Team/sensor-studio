@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -87,23 +85,38 @@ class PointData {
 
 @riverpod
 class PointCloudData extends _$PointCloudData {
+  // 토픽별 처리 중 여부 및 대기 중인 최신 페이로드
+  final _isProcessing = <String, bool>{};
+  final _pendingPayloads = <String, Map<String, dynamic>>{};
+
   @override
   Map<String, List<PointData>> build() {
     return {};
   }
 
-  // 💡 비동기(async) 처리로 변경하여 백그라운드 연산을 기다리도록 합니다.
   Future<void> processPayload(
     String topic,
     Map<String, dynamic> payload,
   ) async {
-    // compute()를 통해 무거운 파싱 함수와 데이터를 백그라운드 스레드에서 처리
-    // 메인 화면(UI)은 파싱이 끝날 때까지 멈추지 않고 부드럽게 유지
-    final parsedPoints = await compute(_parsePointCloudInBackground, payload);
+    // 이미 처리 중이면 최신 프레임만 보관하고 중간 프레임은 드롭
+    if (_isProcessing[topic] == true) {
+      _pendingPayloads[topic] = payload;
+      return;
+    }
 
-    if (parsedPoints.isNotEmpty) {
-      // 연산이 완료된 완성품(parsedPoints)만 전달받아 UI 상태를 업데이트합니다.
-      state = {...state, topic: parsedPoints};
+    _isProcessing[topic] = true;
+    try {
+      final parsedPoints = await compute(_parsePointCloudInBackground, payload);
+      if (parsedPoints.isNotEmpty) {
+        state = {...state, topic: parsedPoints};
+      }
+    } finally {
+      _isProcessing[topic] = false;
+      // 처리 완료 후 대기 중인 최신 프레임이 있으면 즉시 처리
+      final pending = _pendingPayloads.remove(topic);
+      if (pending != null) {
+        processPayload(topic, pending);
+      }
     }
   }
 }
