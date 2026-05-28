@@ -4,7 +4,7 @@ pub mod encoder;
 pub mod protocol;
 
 pub use crate::stream::websocket::foxglove::encoder::{
-    encode_point_cloud_payload, make_message_data_frame,
+    encode_point_cloud_payload, encode_point_cloud_payload_binary, make_message_data_frame,
 };
 
 pub use crate::stream::websocket::foxglove::protocol::{
