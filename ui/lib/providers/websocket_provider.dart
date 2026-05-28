@@ -130,22 +130,28 @@ class WebSocketManager extends _$WebSocketManager {
         final subId = byteData.getUint32(1, Endian.little);
         final payloadBytes = bytes.sublist(13);
 
-        try {
-          final payloadStr = utf8.decode(payloadBytes);
-          final payloadJson = jsonDecode(payloadStr);
+        final topic = state.activeSubscriptions.entries
+            .where((e) => e.value == subId)
+            .map((e) => e.key)
+            .firstOrNull;
 
-          final topic = state.activeSubscriptions.entries
-              .where((e) => e.value == subId)
-              .map((e) => e.key)
-              .firstOrNull;
+        if (topic == null) return;
 
-          if (topic != null) {
+        if (topic.endsWith('/raw')) {
+          // 커스텀 바이너리 포맷 — JSON 디코딩 없이 bytes 직접 전달
+          ref
+              .read(pointCloudDataProvider.notifier)
+              .processBinaryPayload(topic, payloadBytes);
+        } else {
+          try {
+            final payloadStr = utf8.decode(payloadBytes);
+            final payloadJson = jsonDecode(payloadStr);
             ref
                 .read(pointCloudDataProvider.notifier)
                 .processPayload(topic, payloadJson);
+          } catch (e) {
+            _log.warning('Failed to parse binary payload: $e');
           }
-        } catch (e) {
-          _log.warning('Failed to parse binary payload: $e');
         }
       }
     }

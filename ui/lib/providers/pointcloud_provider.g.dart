@@ -13,7 +13,7 @@ part of 'pointcloud_provider.dart';
 final pointCloudDataProvider = PointCloudDataProvider._();
 
 final class PointCloudDataProvider
-    extends $NotifierProvider<PointCloudData, Map<String, List<PointData>>> {
+    extends $NotifierProvider<PointCloudData, Map<String, PointCloudBuffer>> {
   PointCloudDataProvider._()
     : super(
         from: null,
@@ -33,33 +33,38 @@ final class PointCloudDataProvider
   PointCloudData create() => PointCloudData();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Map<String, List<PointData>> value) {
+  Override overrideWithValue(Map<String, PointCloudBuffer> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<Map<String, List<PointData>>>(value),
+      providerOverride: $SyncValueProvider<Map<String, PointCloudBuffer>>(
+        value,
+      ),
     );
   }
 }
 
-String _$pointCloudDataHash() => r'64a7018a1e931ef381d77ff2e6c6424e30692d82';
+String _$pointCloudDataHash() => r'b446d1ca2b9ed89b67276ba1e18c63cbca2de9fa';
 
 abstract class _$PointCloudData
-    extends $Notifier<Map<String, List<PointData>>> {
-  Map<String, List<PointData>> build();
+    extends $Notifier<Map<String, PointCloudBuffer>> {
+  Map<String, PointCloudBuffer> build();
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
         this.ref
-            as $Ref<Map<String, List<PointData>>, Map<String, List<PointData>>>;
+            as $Ref<
+              Map<String, PointCloudBuffer>,
+              Map<String, PointCloudBuffer>
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                Map<String, List<PointData>>,
-                Map<String, List<PointData>>
+                Map<String, PointCloudBuffer>,
+                Map<String, PointCloudBuffer>
               >,
-              Map<String, List<PointData>>,
+              Map<String, PointCloudBuffer>,
               Object?,
               Object?
             >;

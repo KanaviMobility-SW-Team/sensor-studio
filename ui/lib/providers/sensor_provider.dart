@@ -15,8 +15,8 @@ class SensorConfig {
     required this.name,
     this.displayName = "",
     this.isVisible = false,
-    this.pointSize = 2.0,
-    this.opacity = 1.0,
+    this.pointSize = 1.5,
+    this.opacity = 0.6,
     this.colorField = 'intensity',
     this.colorMap = 'turbo',
   });
@@ -24,12 +24,16 @@ class SensorConfig {
   factory SensorConfig.fromTopic(
     String topic, {
     bool isVisible = false,
-    double pointSize = 2.0,
-    double opacity = 1.0,
+    double pointSize = 1.5,
+    double opacity = 0.6,
     String colorField = 'intensity',
     String colorMap = 'turbo',
   }) {
-    final displayName = topic.split('/').last;
+    var splitString = topic.split('/');
+    var displayName = splitString.isNotEmpty ? splitString.last : topic;
+    if (displayName == "raw") {
+      displayName = splitString[splitString.length - 2];
+    }
 
     return SensorConfig(
       name: topic,
@@ -50,7 +54,13 @@ class SensorConfig {
     String? colorField,
     String? colorMap,
   }) {
-    final displayName = this.name.split('/').last;
+    if (name != null) {
+      var splitString = name.split('/');
+      var displayName = splitString.isNotEmpty ? splitString.last : name;
+      if (displayName == "raw") {
+        displayName = splitString[splitString.length - 2];
+      }
+    }
 
     return SensorConfig(
       name: name ?? this.name,
@@ -76,6 +86,9 @@ class SensorList extends _$SensorList {
     final List<SensorConfig> updatedList = [];
 
     for (final topic in advertisedTopics) {
+      // raw 토픽(binary point cloud 데이터)이 아닌 경우 무시
+      if (!topic.endsWith('/raw')) continue;
+
       final existing = currentSensors.where((s) => s.name == topic).firstOrNull;
 
       if (existing != null) {

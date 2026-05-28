@@ -596,10 +596,10 @@ packages:
     dependency: "direct main"
     description:
       name: point_glass
-      sha256: c347c8b4bcf8013a30c6430fc373072a378516d602e931ea1331a331149b4d73
+      sha256: "7cf11f6c9ef0e79c7658d7e6af8c2f885a929a889d61b32fb1b7b65bef0895c6"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.1"
+    version: "1.2.0"
   pool:
     dependency: transitive
     description:
