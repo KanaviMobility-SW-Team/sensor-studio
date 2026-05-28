@@ -23,13 +23,15 @@ pub fn foxglove_server_info_message() -> String {
 fn foxglove_encoding(encoder: ChannelEncoder) -> &'static str {
     match encoder {
         ChannelEncoder::Json => "json",
+        ChannelEncoder::Binary => "binary",
     }
 }
 
-fn foxglove_schema_name(schema: ChannelSchema) -> &'static str {
-    match schema {
-        ChannelSchema::PointCloud => "foxglove.PointCloud",
-        ChannelSchema::Status => "foxglove.RawMessage",
+fn foxglove_schema_name(channel: &ChannelDescriptor) -> &'static str {
+    match (channel.message_schema, channel.encoder) {
+        (ChannelSchema::PointCloud, ChannelEncoder::Json) => "foxglove.PointCloud",
+        (ChannelSchema::PointCloud, ChannelEncoder::Binary) => "PointCloudBinary",
+        (ChannelSchema::Status, _) => "foxglove.RawMessage",
     }
 }
 
@@ -38,7 +40,7 @@ fn channel_to_foxglove_advertise(channel: &ChannelDescriptor) -> Value {
         "id": channel.id,
         "topic": channel.topic,
         "encoding": foxglove_encoding(channel.encoder),
-        "schemaName": foxglove_schema_name(channel.message_schema),
+        "schemaName": foxglove_schema_name(channel),
         "schema": "",
     })
 }

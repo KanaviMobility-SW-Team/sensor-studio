@@ -29,6 +29,7 @@ pub enum ChannelSchema {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChannelEncoder {
     Json,
+    Binary,
 }
 
 /// 전체 활성 채널 상태 레지스트리
@@ -45,23 +46,42 @@ impl ChannelRegistry {
     pub fn from_instance_configs(configs: &[InstanceRuntimeConfig]) -> Self {
         let channels = configs
             .iter()
-            .map(|config| {
+            .flat_map(|config| {
                 let channel = &config.channel;
 
-                ChannelDescriptor {
+                let schema = match channel.schema {
+                    ChannelSchemaConfig::PointCloud => ChannelSchema::PointCloud,
+                    ChannelSchemaConfig::Status => ChannelSchema::Status,
+                };
+                let encoder = match channel.encoder {
+                    ChannelEncoderConfig::Json => ChannelEncoder::Json,
+                };
+                let source = ChannelSource {
+                    id: channel.source_id.clone(),
+                };
+
+                let json_channel = ChannelDescriptor {
                     id: channel.channel_id,
                     topic: channel.topic.clone(),
-                    source: ChannelSource {
-                        id: channel.source_id.clone(),
-                    },
-                    message_schema: match channel.schema {
-                        ChannelSchemaConfig::PointCloud => ChannelSchema::PointCloud,
-                        ChannelSchemaConfig::Status => ChannelSchema::Status,
-                    },
-                    encoder: match channel.encoder {
-                        ChannelEncoderConfig::Json => ChannelEncoder::Json,
-                    },
+                    source: source.clone(),
+                    message_schema: schema,
+                    encoder,
+                };
+
+                let mut result = vec![json_channel];
+
+                // PointCloud Json 채널에 대해 binary 쌍 채널 자동 생성
+                if schema == ChannelSchema::PointCloud && encoder == ChannelEncoder::Json {
+                    result.push(ChannelDescriptor {
+                        id: channel.channel_id + 0x8000,
+                        topic: format!("{}/raw", channel.topic),
+                        source,
+                        message_schema: schema,
+                        encoder: ChannelEncoder::Binary,
+                    });
                 }
+
+                result
             })
             .collect();
 
@@ -86,5 +106,12 @@ impl ChannelRegistry {
         self.channels
             .iter()
             .find(|channel| channel.source.id == source_id)
+    }
+
+    pub fn get_all_by_source(&self, source_id: &str) -> Vec<&ChannelDescriptor> {
+        self.channels
+            .iter()
+            .filter(|channel| channel.source.id == source_id)
+            .collect()
     }
 }
