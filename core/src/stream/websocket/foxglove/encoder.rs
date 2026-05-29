@@ -54,3 +54,29 @@ fn to_foxglove_numeric_type(datatype: PointFieldDataType) -> u8 {
         _default => 0, // Unknown or unsupported types
     }
 }
+
+/// 커스텀 바이너리 포맷으로 포인트 클라우드 직렬화
+///
+/// 포맷:
+///   [point_stride: u32 LE]
+///   [num_fields: u8]
+///   for each field:
+///     [name_len: u8][name: utf8][offset: u16 LE][type: u8]
+///   [raw point bytes]
+pub fn encode_point_cloud_payload_binary(frame: &PointCloudFrame) -> Vec<u8> {
+    let mut buf = Vec::new();
+
+    buf.extend_from_slice(&(frame.point_step as u32).to_le_bytes());
+    buf.push(frame.fields.len() as u8);
+
+    for field in &frame.fields {
+        let name = field.name.as_bytes();
+        buf.push(name.len() as u8);
+        buf.extend_from_slice(name);
+        buf.extend_from_slice(&(field.offset as u16).to_le_bytes());
+        buf.push(to_foxglove_numeric_type(field.datatype));
+    }
+
+    buf.extend_from_slice(&frame.data);
+    buf
+}

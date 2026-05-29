@@ -44,7 +44,6 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
           final colorMap = sensor.colorMap == 'turbo'
               ? ColorMap.turbo
               : ColorMap.rainbow;
-          final isDistanceField = sensor.colorField == 'distance';
 
           return PointGlassRawPoints(
             enable: true,
@@ -53,8 +52,8 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
             fields: pcbuf.fields,
             colorMap: colorMap,
             colorField: sensor.colorField,
-            colorMin: 0.0,
-            colorMax: isDistanceField ? 10.0 : 12000.0,
+            colorMin: sensor.colorMin,
+            colorMax: sensor.colorMax,
             strokeWidth: sensor.pointSize,
             alpha: (sensor.opacity * 255).toInt(),
           );
@@ -71,8 +70,8 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
     final gridSettings = ref.watch(gridSettingsProvider);
 
     // 데이터 또는 센서 설정이 바뀌면 백그라운드에서 색상 재계산
-    ref.listen(pointCloudDataProvider, (_, __) => _scheduleRender());
-    ref.listen(sensorListProvider, (_, __) => _scheduleRender());
+    ref.listen(pointCloudDataProvider, (_, _) => _scheduleRender());
+    ref.listen(sensorListProvider, (_, _) => _scheduleRender());
 
     return Expanded(
       child: Container(

@@ -15,11 +15,13 @@ use serde_json::Value;
 use tokio::sync::{Mutex, broadcast};
 
 use crate::runtime::extensions::EngineExtensionRegistry;
+use crate::stream::channel::ChannelEncoder;
 use crate::stream::channel::ChannelRegistry;
 use crate::stream::websocket::WebSocketMessage;
 use crate::stream::websocket::foxglove::{
     FOXGLOVE_SUBPROTOCOL, FoxgloveClientCommand, FoxgloveClientMessage, encode_point_cloud_payload,
-    foxglove_advertise_message, foxglove_server_info_message, make_message_data_frame,
+    encode_point_cloud_payload_binary, foxglove_advertise_message, foxglove_server_info_message,
+    make_message_data_frame,
 };
 use crate::stream::websocket::protocol::{
     ClientControlMessage, EngineExtensionApiInfoDto, ServerControlMessage,
@@ -121,33 +123,43 @@ impl WebSocketServer {
             loop {
                 match rx.recv().await {
                     Ok(WebSocketMessage { source_id, frame }) => {
-                        let Some(channel) = channel_registry.get_by_source(source_id.as_str())
-                        else {
+                        let channels = channel_registry.get_all_by_source(source_id.as_str());
+                        if channels.is_empty() {
                             continue;
-                        };
+                        }
 
                         let subscriptions = send_subscriptions.lock().await;
 
-                        for (subscription_id, channel_id) in subscriptions.iter() {
-                            if *channel_id != channel.id {
-                                continue;
-                            }
+                        'channel: for channel in &channels {
+                            let payload = match channel.encoder {
+                                ChannelEncoder::Json => encode_point_cloud_payload(&frame),
+                                ChannelEncoder::Binary => encode_point_cloud_payload_binary(&frame),
+                            };
 
-                            let timestamp_ns = frame.timestamp_ns;
-                            let payload = encode_point_cloud_payload(&frame);
-                            let binary =
-                                make_message_data_frame(*subscription_id, timestamp_ns, &payload);
+                            for (subscription_id, channel_id) in subscriptions.iter() {
+                                if *channel_id != channel.id {
+                                    continue;
+                                }
 
-                            if let Err(err) = out_tx_clone.try_send(Message::Binary(binary.into()))
-                            {
-                                if let tokio::sync::mpsc::error::TrySendError::Full(_) = err {
-                                    tracing::warn!(
-                                        "websocket outbound queue full for client. dropping frame for subscription_id={}",
-                                        *subscription_id
-                                    );
-                                } else {
-                                    // 채널이 닫혔을 때(Closed 오류 등)
-                                    break;
+                                let timestamp_ns = frame.timestamp_ns;
+                                let binary = make_message_data_frame(
+                                    *subscription_id,
+                                    timestamp_ns,
+                                    &payload,
+                                );
+
+                                if let Err(err) =
+                                    out_tx_clone.try_send(Message::Binary(binary.into()))
+                                {
+                                    if let tokio::sync::mpsc::error::TrySendError::Full(_) = err {
+                                        tracing::warn!(
+                                            "websocket outbound queue full for client. dropping frame for subscription_id={}",
+                                            *subscription_id
+                                        );
+                                    } else {
+                                        // 채널이 닫혔을 때(Closed 오류 등)
+                                        break 'channel;
+                                    }
                                 }
                             }
                         }
