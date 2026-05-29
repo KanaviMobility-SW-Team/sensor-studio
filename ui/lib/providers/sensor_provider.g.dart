@@ -41,7 +41,7 @@ final class SensorListProvider
   }
 }
 
-String _$sensorListHash() => r'61cad5970725a50bce99e07779bec76aa9771911';
+String _$sensorListHash() => r'f0df4ffabc310a1ef649000fcc0c285a80705eae';
 
 abstract class _$SensorList extends $Notifier<List<SensorConfig>> {
   List<SensorConfig> build();

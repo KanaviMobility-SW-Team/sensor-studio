@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/websocket_provider.dart';
+import 'package:ui/providers/websocket_provider.dart';
+import 'package:ui/theme/app_colors.dart';
 
 class MainHeader extends ConsumerWidget {
   const MainHeader({super.key});
@@ -41,18 +42,20 @@ class MainHeader extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          const Text(
+          Image.asset('assets/logo.png', height: 30),
+          const SizedBox(width: 8),
+          Text(
             'Sensor-Studio',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontSize: 16,
+              color: AppColors.accent,
+              fontSize: 18,
             ),
           ),
           const Spacer(),
           Container(
-            width: 10,
-            height: 10,
+            width: 14,
+            height: 14,
             decoration: BoxDecoration(
               color: statusColor,
               shape: BoxShape.circle,
@@ -61,24 +64,25 @@ class MainHeader extends ConsumerWidget {
           const SizedBox(width: 8),
           Text(
             statusText,
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
-          const SizedBox(width: 24),
-          IconButton(
-            icon: const Icon(Icons.play_arrow, size: 20),
-            color: Colors.greenAccent,
-            onPressed: () {
-              // 임시로 localhost 포트 8080 연결 시도
-              wsNotifier.connect('ws://localhost:8080/ws');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.stop, size: 20),
-            color: Colors.redAccent,
-            onPressed: () {
-              wsNotifier.disconnect();
-            },
-          ),
+          const SizedBox(width: 16),
+          wsState.status != ConnectionStatus.connected
+              ? IconButton(
+                  icon: const Icon(Icons.link, size: 24),
+                  color: Colors.greenAccent,
+                  onPressed: () {
+                    // 임시로 localhost 포트 8080 연결 시도
+                    wsNotifier.connect('ws://localhost:8080/ws');
+                  },
+                )
+              : IconButton(
+                  icon: const Icon(Icons.link_off, size: 20),
+                  color: Colors.redAccent,
+                  onPressed: () {
+                    wsNotifier.disconnect();
+                  },
+                ),
         ],
       ),
     );

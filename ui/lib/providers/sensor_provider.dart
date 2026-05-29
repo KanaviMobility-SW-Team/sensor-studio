@@ -4,22 +4,56 @@ part 'sensor_provider.g.dart';
 
 class SensorConfig {
   final String name;
+  final String displayName;
   final bool isVisible;
   final double pointSize;
   final double opacity;
   final String colorField;
   final String colorMap;
+  final double colorMin;
+  final double colorMax;
 
   SensorConfig({
     required this.name,
-    this.isVisible = true,
-    this.pointSize = 2.0,
-    this.opacity = 1.0,
-    this.colorField = 'intensity',
+    this.displayName = "",
+    this.isVisible = false,
+    this.pointSize = 1.5,
+    this.opacity = 0.6,
+    this.colorField = 'distance',
     this.colorMap = 'turbo',
+    this.colorMin = 0.0,
+    this.colorMax = 20.0,
   });
 
-  // 상태 업데이트를 위한 copyWith 메서드
+  factory SensorConfig.fromTopic(
+    String topic, {
+    bool isVisible = false,
+    double pointSize = 1.5,
+    double opacity = 0.6,
+    String colorField = 'distance',
+    String colorMap = 'turbo',
+    double colorMin = 0.0,
+    double colorMax = 20.0,
+  }) {
+    var splitString = topic.split('/');
+    var displayName = splitString.isNotEmpty ? splitString.last : topic;
+    if (displayName == "raw") {
+      displayName = splitString[splitString.length - 2];
+    }
+
+    return SensorConfig(
+      name: topic,
+      displayName: displayName,
+      isVisible: isVisible,
+      pointSize: pointSize,
+      opacity: opacity,
+      colorField: colorField,
+      colorMap: colorMap,
+      colorMin: colorMin,
+      colorMax: colorMax,
+    );
+  }
+
   SensorConfig copyWith({
     String? name,
     bool? isVisible,
@@ -27,14 +61,19 @@ class SensorConfig {
     double? opacity,
     String? colorField,
     String? colorMap,
+    double? colorMin,
+    double? colorMax,
   }) {
     return SensorConfig(
       name: name ?? this.name,
+      displayName: displayName,
       isVisible: isVisible ?? this.isVisible,
       pointSize: pointSize ?? this.pointSize,
       opacity: opacity ?? this.opacity,
       colorField: colorField ?? this.colorField,
       colorMap: colorMap ?? this.colorMap,
+      colorMin: colorMin ?? this.colorMin,
+      colorMax: colorMax ?? this.colorMax,
     );
   }
 }
@@ -43,15 +82,31 @@ class SensorConfig {
 class SensorList extends _$SensorList {
   @override
   List<SensorConfig> build() {
-    // 앱 실행 시 최초로 세팅되는 센서 리스트 (초기 상태)
-    return [
-      SensorConfig(name: 'lidar_roof'),
-      SensorConfig(name: 'lidar_bumper'),
-      SensorConfig(name: 'radar_front'),
-    ];
+    return [];
   }
 
-  // --- 상태 변경 메서드들 ---
+  void syncSensors(List<String> advertisedTopics) {
+    final currentSensors = state;
+    final List<SensorConfig> updatedList = [];
+
+    for (final topic in advertisedTopics) {
+      // raw 토픽(binary point cloud 데이터)이 아닌 경우 무시
+      if (!topic.endsWith('/raw')) continue;
+
+      final existing = currentSensors.where((s) => s.name == topic).firstOrNull;
+
+      if (existing != null) {
+        // 이미 리스트에 있는 센서(토픽)라면 기존 설정(투명도, 크기 등)을 그대로 유지
+        updatedList.add(existing);
+      } else {
+        // 새로 발견된 토픽이라면 기본 설정으로 추가 (기본적으로 시각화 Off 상태로 추가)
+        updatedList.add(SensorConfig.fromTopic(topic));
+      }
+    }
+
+    state = updatedList;
+  }
+
   void _updateSensor(String name, SensorConfig Function(SensorConfig) updater) {
     state = [
       for (final sensor in state)
@@ -77,5 +132,9 @@ class SensorList extends _$SensorList {
 
   void updateColorMap(String name, String map) {
     _updateSensor(name, (s) => s.copyWith(colorMap: map));
+  }
+
+  void updateColorRange(String name, double min, double max) {
+    _updateSensor(name, (s) => s.copyWith(colorMin: min, colorMax: max));
   }
 }
