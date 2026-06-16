@@ -102,23 +102,55 @@ impl WebSocketServer {
             return;
         }
 
-        let (out_tx, mut out_rx) = tokio::sync::mpsc::channel::<Message>(64);
+        // ====================================================================
+        // [개선된 아키텍처]: Queue -> State(전광판) 방식으로 완벽 교체
+        // ====================================================================
+        // 1. 제어 메시지용 큐 (무제한 큐: API 응답 등은 절대 유실되면 안 됨)
+        let (control_tx, mut control_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
 
+        // 2. 센서 데이터 보관용 전광판 (센서(SubID)별로 최신 1프레임만 유지)
+        let pending_frames = Arc::new(Mutex::new(HashMap::<u32, Message>::new()));
+
+        // 3. 전송 알리미 (새 데이터가 덮어씌워졌음을 소비자에게 알림)
+        let notify = Arc::new(tokio::sync::Notify::new());
+
+        let pending_frames_clone = pending_frames.clone();
+        let notify_clone = notify.clone();
+
+        // 웹소켓 전송 전담
         tokio::spawn(async move {
-            while let Some(message) = out_rx.recv().await {
-                if sender.send(message).await.is_err() {
-                    break;
+            loop {
+                tokio::select! {
+                    // 우선순위 1: 제어 메시지가 오면 즉시 전송
+                    Some(ctrl_msg) = control_rx.recv() => {
+                        if sender.send(ctrl_msg).await.is_err() { break; }
+                    }
+                    // 우선순위 2: 새 센서 데이터가 덮어씌워졌다는 알림을 받으면
+                    _ = notify_clone.notified() => {
+                        // 전광판(Map)에 걸려있는 '모든 센서의 가장 최신 프레임'을 싹 수거하고 맵을 비움
+                        let frames_to_send: Vec<Message> = {
+                            let mut map = pending_frames_clone.lock().await;
+                            map.drain().map(|(_, msg)| msg).collect()
+                        };
+
+                        // 수거한 최신 프레임들을 지연 없이 전송
+                        for msg in frames_to_send {
+                            if sender.send(msg).await.is_err() { return; }
+                        }
+                    }
                 }
             }
         });
 
         let subscriptions = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
-
         let send_subscriptions = Arc::clone(&subscriptions);
         let recv_subscriptions = Arc::clone(&subscriptions);
 
         let mut rx = receiver;
-        let out_tx_clone = out_tx.clone();
+        let pending_frames_tx = pending_frames.clone();
+        let notify_tx = notify.clone();
+
+        // 데이터 수신 및 인코딩 전담
         let send_task = tokio::spawn(async move {
             loop {
                 match rx.recv().await {
@@ -130,42 +162,45 @@ impl WebSocketServer {
 
                         let subscriptions = send_subscriptions.lock().await;
 
-                        'channel: for channel in &channels {
-                            let payload = match channel.encoder {
-                                ChannelEncoder::Json => encode_point_cloud_payload(&frame),
-                                ChannelEncoder::Binary => encode_point_cloud_payload_binary(&frame),
-                            };
+                        for channel in &channels {
+                            let mut payload_encoded = false;
+                            let mut payload = Vec::new();
 
                             for (subscription_id, channel_id) in subscriptions.iter() {
                                 if *channel_id != channel.id {
                                     continue;
                                 }
 
-                                let timestamp_ns = frame.timestamp_ns;
+                                // 지연 인코딩 최적화
+                                if !payload_encoded {
+                                    payload = match channel.encoder {
+                                        ChannelEncoder::Json => encode_point_cloud_payload(&frame),
+                                        ChannelEncoder::Binary => {
+                                            encode_point_cloud_payload_binary(&frame)
+                                        }
+                                    };
+                                    payload_encoded = true;
+                                }
+
                                 let binary = make_message_data_frame(
                                     *subscription_id,
-                                    timestamp_ns,
+                                    frame.timestamp_ns,
                                     &payload,
                                 );
 
-                                if let Err(err) =
-                                    out_tx_clone.try_send(Message::Binary(binary.into()))
-                                {
-                                    if let tokio::sync::mpsc::error::TrySendError::Full(_) = err {
-                                        tracing::warn!(
-                                            "websocket outbound queue full for client. dropping frame for subscription_id={}",
-                                            *subscription_id
-                                        );
-                                    } else {
-                                        // 채널이 닫혔을 때(Closed 오류 등)
-                                        break 'channel;
-                                    }
-                                }
+                                // 큐에 줄을 세우지 않고, 센서(SubID)별 자기 자리에 "최신 데이터 덮어쓰기"
+                                pending_frames_tx
+                                    .lock()
+                                    .await
+                                    .insert(*subscription_id, Message::Binary(binary.into()));
+
+                                // 데이터 갱신 완료 알림 (웹소켓 전송작업이 대기 중이면 즉각 깨움)
+                                notify_tx.notify_one();
                             }
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(count)) => {
-                        tracing::warn!("websocket client lagged, skipped {count} messages");
+                        tracing::warn!("websocket broadcast lagged, skipped {count} frames");
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => {
@@ -175,7 +210,7 @@ impl WebSocketServer {
             }
         });
 
-        let out_tx_clone = out_tx.clone();
+        let control_tx_clone = control_tx.clone();
         let recv_task = tokio::spawn(async move {
             while let Some(Ok(message)) = incoming.next().await {
                 match message {
@@ -212,13 +247,9 @@ impl WebSocketServer {
                                         Self::handle_control_message(&text, &extension_registry)
                                             .await
                                     {
-                                        if out_tx_clone
-                                            .send(Message::Text(response.into()))
-                                            .await
-                                            .is_err()
-                                        {
-                                            return;
-                                        }
+                                        // 제어 메시지는 유실되지 않도록 control_tx로 보냅니다.
+                                        let _ =
+                                            control_tx_clone.send(Message::Text(response.into()));
                                     }
                                 }
                             }
