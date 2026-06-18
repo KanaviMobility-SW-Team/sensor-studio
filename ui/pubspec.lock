@@ -592,14 +592,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
-  point_glass:
+  point_glass_opengl:
     dependency: "direct main"
     description:
-      name: point_glass
-      sha256: "7cf11f6c9ef0e79c7658d7e6af8c2f885a929a889d61b32fb1b7b65bef0895c6"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.2.0"
+      path: "/home/immsong/dev/immsong/point_glass_opengl"
+      relative: false
+    source: path
+    version: "0.0.1"
   pool:
     dependency: transitive
     description:
@@ -813,14 +812,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
-  universal_platform:
-    dependency: transitive
-    description:
-      name: universal_platform
-      sha256: "64e16458a0ea9b99260ceb5467a214c1f298d647c659af1bff6d3bf82536b1ec"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.0"
   vector_math:
     dependency: "direct main"
     description:

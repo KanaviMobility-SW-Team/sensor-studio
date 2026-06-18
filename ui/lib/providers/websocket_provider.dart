@@ -128,7 +128,7 @@ class WebSocketManager extends _$WebSocketManager {
 
         // 구조: [0x01] + [SubID(4)] + [Timestamp(8)] + [Payload]
         final subId = byteData.getUint32(1, Endian.little);
-        final payloadBytes = bytes.sublist(13);
+        final payloadBytes = Uint8List.sublistView(bytes, 13);
 
         final topic = state.activeSubscriptions.entries
             .where((e) => e.value == subId)

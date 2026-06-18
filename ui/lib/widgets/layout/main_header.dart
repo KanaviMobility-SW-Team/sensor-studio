@@ -73,7 +73,7 @@ class MainHeader extends ConsumerWidget {
                   color: Colors.greenAccent,
                   onPressed: () {
                     // 임시로 localhost 포트 8080 연결 시도
-                    wsNotifier.connect('ws://localhost:8080/ws');
+                    wsNotifier.connect('ws://192.168.123.162:8080/ws');
                   },
                 )
               : IconButton(

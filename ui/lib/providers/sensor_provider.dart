@@ -10,8 +10,7 @@ class SensorConfig {
   final double opacity;
   final String colorField;
   final String colorMap;
-  final double colorMin;
-  final double colorMax;
+  final Map<String, (double, double)> valueRange;
 
   SensorConfig({
     required this.name,
@@ -19,10 +18,13 @@ class SensorConfig {
     this.isVisible = false,
     this.pointSize = 1.5,
     this.opacity = 0.6,
-    this.colorField = 'distance',
-    this.colorMap = 'turbo',
-    this.colorMin = 0.0,
-    this.colorMax = 20.0,
+    this.colorField = 'intensity',
+    this.colorMap = 'viridis',
+    this.valueRange = const {
+      'intensity': (0.0, 0.0),
+      'distance': (0.0, 0.0),
+      'z': (0.0, 0.0),
+    },
   });
 
   factory SensorConfig.fromTopic(
@@ -30,10 +32,8 @@ class SensorConfig {
     bool isVisible = false,
     double pointSize = 1.5,
     double opacity = 0.6,
-    String colorField = 'distance',
-    String colorMap = 'turbo',
-    double colorMin = 0.0,
-    double colorMax = 20.0,
+    String colorField = 'intensity',
+    String colorMap = 'viridis',
   }) {
     var splitString = topic.split('/');
     var displayName = splitString.isNotEmpty ? splitString.last : topic;
@@ -49,8 +49,6 @@ class SensorConfig {
       opacity: opacity,
       colorField: colorField,
       colorMap: colorMap,
-      colorMin: colorMin,
-      colorMax: colorMax,
     );
   }
 
@@ -61,8 +59,7 @@ class SensorConfig {
     double? opacity,
     String? colorField,
     String? colorMap,
-    double? colorMin,
-    double? colorMax,
+    Map<String, (double, double)>? valueRange,
   }) {
     return SensorConfig(
       name: name ?? this.name,
@@ -72,8 +69,7 @@ class SensorConfig {
       opacity: opacity ?? this.opacity,
       colorField: colorField ?? this.colorField,
       colorMap: colorMap ?? this.colorMap,
-      colorMin: colorMin ?? this.colorMin,
-      colorMax: colorMax ?? this.colorMax,
+      valueRange: valueRange ?? this.valueRange,
     );
   }
 }
@@ -134,7 +130,11 @@ class SensorList extends _$SensorList {
     _updateSensor(name, (s) => s.copyWith(colorMap: map));
   }
 
-  void updateColorRange(String name, double min, double max) {
-    _updateSensor(name, (s) => s.copyWith(colorMin: min, colorMax: max));
+  void updateValueRange(String name, String field, double min, double max) {
+    _updateSensor(name, (s) {
+      final newValueRange = Map<String, (double, double)>.from(s.valueRange);
+      newValueRange[field] = (min, max);
+      return s.copyWith(valueRange: newValueRange);
+    });
   }
 }
