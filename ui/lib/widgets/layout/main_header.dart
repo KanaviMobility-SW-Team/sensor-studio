@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ui/providers/loading_overlay_provider.dart';
 import 'package:ui/providers/websocket_provider.dart';
 import 'package:ui/theme/app_colors.dart';
+import 'package:ui/widgets/dialogs/text_input_dialog.dart';
 
 class MainHeader extends ConsumerWidget {
   const MainHeader({super.key});
@@ -13,6 +15,22 @@ class MainHeader extends ConsumerWidget {
     // 상태 구독
     final wsState = ref.watch(webSocketManagerProvider);
     final wsNotifier = ref.read(webSocketManagerProvider.notifier);
+
+    ref.listen<ConnectionStatus>(
+      webSocketManagerProvider.select((state) => state.status),
+      (previous, next) {
+        if (previous == next) {
+          return;
+        }
+
+        final loadingNotifier = ref.read(loadingOverlayProvider.notifier);
+        if (next == ConnectionStatus.connecting) {
+          loadingNotifier.show();
+        } else {
+          loadingNotifier.hide();
+        }
+      },
+    );
 
     // 상태에 따른 UI 색상/텍스트 분기 처리
     Color statusColor;
@@ -71,9 +89,21 @@ class MainHeader extends ConsumerWidget {
               ? IconButton(
                   icon: const Icon(Icons.link, size: 24),
                   color: Colors.greenAccent,
-                  onPressed: () {
-                    // 임시로 localhost 포트 8080 연결 시도
-                    wsNotifier.connect('ws://localhost:8080/ws');
+                  onPressed: () async {
+                    var value = await textInputShowDialog(
+                      context: context,
+                      title: 'Connect to WebSocket',
+                      hint: 'Enter WebSocket URL',
+                      init: 'ws://localhost:8080/ws',
+                      submitText: 'Connect',
+                      cancelText: 'Cancel',
+                    );
+
+                    if (value.isEmpty) {
+                      return;
+                    }
+
+                    await wsNotifier.connect(value);
                   },
                 )
               : IconButton(

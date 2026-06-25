@@ -65,62 +65,65 @@ class _NumberInputControlState extends State<NumberInputControl> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        SizedBox(
-          width: 110,
-          child: Text(
-            widget.label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(5.0),
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              keyboardType: const TextInputType.numberWithOptions(
-                signed: true,
-                decimal: true,
-              ),
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 7,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: const BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: const BorderSide(color: AppColors.accent),
-                ),
-              ),
-              onSubmitted: (_) => _commit(),
-            ),
-          ),
-        ),
-        if (widget.onAuto != null)
+    return Padding(
+      padding: const EdgeInsets.only(top: 2.0, bottom: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
           SizedBox(
-            width: 28,
-            height: 28,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              onPressed: widget.onAuto,
-              icon: const Icon(
-                Icons.refresh,
-                size: 16,
-                color: AppColors.accent,
+            width: 110,
+            child: Text(
+              widget.label,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(5.0),
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                keyboardType: const TextInputType.numberWithOptions(
+                  signed: true,
+                  decimal: true,
+                ),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 7,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: AppColors.accent),
+                  ),
+                ),
+                onSubmitted: (_) => _commit(),
               ),
             ),
           ),
-      ],
+          if (widget.onAuto != null)
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                onPressed: widget.onAuto,
+                icon: const Icon(
+                  Icons.refresh,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
