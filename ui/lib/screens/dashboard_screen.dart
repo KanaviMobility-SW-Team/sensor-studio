@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../widgets/layout/main_header.dart';
-import '../widgets/layout/sensor_sidebar.dart';
-import '../widgets/layout/bottom_console.dart';
-import '../widgets/visualizer/main_visualizer.dart';
+
+import 'package:ui/widgets/layout/main_header.dart';
+import 'package:ui/widgets/layout/sensor_sidebar.dart';
+import 'package:ui/widgets/layout/bottom_console.dart';
+import 'package:ui/widgets/visualizer/main_visualizer.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
