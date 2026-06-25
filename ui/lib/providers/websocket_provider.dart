@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -71,7 +72,7 @@ class WebSocketManager extends _$WebSocketManager {
   }
 
   // WebSocket 서버에 연결하는 함수
-  void connect(String url) {
+  Future<void> connect(String url) async {
     if (state.status == ConnectionStatus.connected) return;
 
     state = state.copyWith(status: ConnectionStatus.connecting);
@@ -79,6 +80,14 @@ class WebSocketManager extends _$WebSocketManager {
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(url));
+
+      await _channel!.ready.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          _channel!.sink.close();
+          throw TimeoutException('WebSocket connection timeout');
+        },
+      );
 
       _channel!.stream.listen(
         (message) => _handleMessage(message),
@@ -128,7 +137,7 @@ class WebSocketManager extends _$WebSocketManager {
 
         // 구조: [0x01] + [SubID(4)] + [Timestamp(8)] + [Payload]
         final subId = byteData.getUint32(1, Endian.little);
-        final payloadBytes = bytes.sublist(13);
+        final payloadBytes = Uint8List.sublistView(bytes, 13);
 
         final topic = state.activeSubscriptions.entries
             .where((e) => e.value == subId)

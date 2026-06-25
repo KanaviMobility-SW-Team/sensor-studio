@@ -1,13 +1,13 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:point_glass/point_glass.dart';
+import 'package:point_glass_opengl/point_glass_opengl.dart';
 
 import 'package:ui/providers/grid_provider.dart';
 import 'package:ui/providers/pointcloud_provider.dart';
-import 'package:ui/providers/view_context_provider.dart';
 import 'package:ui/providers/websocket_provider.dart';
 import 'package:ui/providers/sensor_provider.dart';
 import 'package:ui/theme/app_colors.dart';
@@ -40,7 +40,6 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
     final wsNotifier = ref.read(webSocketManagerProvider.notifier);
     final gridSettings = ref.watch(gridSettingsProvider);
     final gridNotifier = ref.read(gridSettingsProvider.notifier);
-    final viewContext = ref.watch(viewContextProvider);
 
     return Container(
       width: 300,
@@ -67,16 +66,11 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                   return ExpansionTile(
                     collapsedIconColor: Colors.white54,
                     iconColor: AppColors.accent,
-                    leading: InkWell(
-                      onTap: () {
-                        gridNotifier.updateShowGrid(!gridSettings.showGrid);
-                      },
-                      child: Icon(
-                        Icons.grid_4x4,
-                        color: gridSettings.showGrid
-                            ? AppColors.accent
-                            : Colors.white54,
-                      ),
+                    leading: Icon(
+                      Icons.grid_4x4,
+                      color: gridSettings.showGrid
+                          ? AppColors.accent
+                          : Colors.white54,
                     ),
                     title: Text(
                       "GRID",
@@ -87,6 +81,13 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                       vertical: 8.0,
                     ),
                     children: [
+                      OnOffSegmentedControl(
+                        label: 'Enable',
+                        value: gridSettings.showGrid,
+                        onChanged: (val) {
+                          gridNotifier.updateShowGrid(val);
+                        },
+                      ),
                       StepperControl(
                         label: 'Grid Size',
                         value: gridSettings.gridSize.toInt(),
@@ -95,13 +96,6 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                         max: 2000,
                         onChanged: (val) {
                           gridNotifier.updateGridSize(val.toDouble());
-                          viewContext.value = viewContext.value.copyWith(
-                            proj: PinholeProjection(
-                              focalPx: 800 - (val - 30) * (500 / 120),
-                              near: viewContext.value.proj.near,
-                              far: viewContext.value.proj.far,
-                            ),
-                          );
                         },
                       ),
                       StepperControl(
@@ -112,6 +106,20 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                         max: 200,
                         onChanged: (val) {
                           gridNotifier.updateGridStep(val.toDouble());
+                        },
+                      ),
+                      OnOffSegmentedControl(
+                        label: 'Enable Label',
+                        value: gridSettings.showGridLabels,
+                        onChanged: (val) {
+                          gridNotifier.updateShowGridLabels(val);
+                        },
+                      ),
+                      OnOffSegmentedControl(
+                        label: 'Enable Axis',
+                        value: gridSettings.showGridAxis,
+                        onChanged: (val) {
+                          gridNotifier.updateShowGridAxis(val);
                         },
                       ),
                     ],
@@ -136,25 +144,13 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                     },
                     collapsedIconColor: Colors.white54,
                     iconColor: AppColors.accent,
-                    leading: InkWell(
-                      onTap: () {
-                        notifier.toggleVisibility(
-                          sensor.name,
-                          !sensor.isVisible,
-                        );
-                        wsNotifier.toggleSubscription(
-                          sensor.name,
-                          !sensor.isVisible,
-                        );
-                      },
-                      child: Icon(
-                        sensor.isVisible
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                        color: sensor.isVisible
-                            ? AppColors.accent
-                            : Colors.white54,
-                      ),
+                    leading: Icon(
+                      sensor.isVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: sensor.isVisible
+                          ? AppColors.accent
+                          : Colors.white54,
                     ),
                     title: Text(
                       sensor.displayName,
@@ -165,6 +161,45 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                       vertical: 8.0,
                     ),
                     children: [
+                      OnOffSegmentedControl(
+                        label: 'Enable',
+                        value: sensor.isVisible,
+                        onChanged: (_) {
+                          notifier.toggleVisibility(
+                            sensor.name,
+                            !sensor.isVisible,
+                          );
+                          wsNotifier.toggleSubscription(
+                            sensor.name,
+                            !sensor.isVisible,
+                          );
+
+                          // value range 초기화, 600ms 뒤 실행
+                          Timer(const Duration(milliseconds: 600), () {
+                            for (final field in [
+                              'intensity',
+                              'distance',
+                              'z',
+                            ]) {
+                              var (min, max) = _autoColorRange(
+                                sensor.name,
+                                field,
+                              );
+                              if (min.isInfinite || max.isInfinite) {
+                                min = 0.0;
+                                max = 0.0;
+                              }
+
+                              notifier.updateValueRange(
+                                sensor.name,
+                                field,
+                                min,
+                                max,
+                              );
+                            }
+                          });
+                        },
+                      ),
                       DoubleStepperControl(
                         label: 'Point Size',
                         value: sensor.pointSize,
@@ -186,7 +221,7 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                       DropdownControl(
                         label: 'Color Field',
                         value: sensor.colorField,
-                        items: const ['intensity', 'distance'],
+                        items: const ['intensity', 'distance', 'z'],
                         onChanged: (val) {
                           if (val != null) {
                             notifier.updateColorField(sensor.name, val);
@@ -196,7 +231,9 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                       DropdownControl(
                         label: 'Color Map',
                         value: sensor.colorMap,
-                        items: const ['turbo', 'rainbow'],
+                        items: PointGlassOpenGLPointsColorMode.values
+                            .map((e) => e.name)
+                            .toList(),
                         onChanged: (val) {
                           if (val != null) {
                             notifier.updateColorMap(sensor.name, val);
@@ -205,11 +242,12 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                       ),
                       NumberInputControl(
                         label: 'Color Min',
-                        value: sensor.colorMin,
-                        onChanged: (val) => notifier.updateColorRange(
+                        value: sensor.valueRange[sensor.colorField]?.$1 ?? 0.0,
+                        onChanged: (val) => notifier.updateValueRange(
                           sensor.name,
+                          sensor.colorField,
                           val,
-                          sensor.colorMax,
+                          sensor.valueRange[sensor.colorField]?.$2 ?? 0.0,
                         ),
                         onAuto: () {
                           final (min, _) = _autoColorRange(
@@ -221,19 +259,21 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                             return;
                           }
 
-                          notifier.updateColorRange(
+                          notifier.updateValueRange(
                             sensor.name,
+                            sensor.colorField,
                             min,
-                            sensor.colorMax,
+                            sensor.valueRange[sensor.colorField]?.$2 ?? 0.0,
                           );
                         },
                       ),
                       NumberInputControl(
                         label: 'Color Max',
-                        value: sensor.colorMax,
-                        onChanged: (val) => notifier.updateColorRange(
+                        value: sensor.valueRange[sensor.colorField]?.$2 ?? 0.0,
+                        onChanged: (val) => notifier.updateValueRange(
                           sensor.name,
-                          sensor.colorMin,
+                          sensor.colorField,
+                          sensor.valueRange[sensor.colorField]?.$1 ?? 0.0,
                           val,
                         ),
                         onAuto: () {
@@ -246,9 +286,10 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
                             return;
                           }
 
-                          notifier.updateColorRange(
+                          notifier.updateValueRange(
                             sensor.name,
-                            sensor.colorMin,
+                            sensor.colorField,
+                            sensor.valueRange[sensor.colorField]?.$1 ?? 0.0,
                             max,
                           );
                         },
@@ -277,15 +318,23 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
       return (min, max);
     }
 
-    if (colorField == "distance") {
-      final xIdx = pcbuf.fields['x'];
-      final yIdx = pcbuf.fields['y'];
-      final zIdx = pcbuf.fields['z'];
-      if (xIdx == null || yIdx == null || zIdx == null) {
-        return (min, max);
-      }
+    final xIdx = pcbuf.fields['x'];
+    final yIdx = pcbuf.fields['y'];
+    final zIdx = pcbuf.fields['z'];
+    if (xIdx == null || yIdx == null || zIdx == null) {
+      return (min, max);
+    }
 
-      final numPoints = pcbuf.buf.length ~/ pcbuf.stride;
+    final numPoints = pcbuf.buf.length ~/ pcbuf.stride;
+    if (colorField == "z") {
+      for (int i = 0; i < numPoints; i++) {
+        final base = i * pcbuf.stride;
+        final z = pcbuf.buf[base + zIdx];
+
+        if (z < min) min = z;
+        if (z > max) max = z;
+      }
+    } else if (colorField == "distance") {
       for (int i = 0; i < numPoints; i++) {
         final base = i * pcbuf.stride;
         final x = pcbuf.buf[base + xIdx];
@@ -302,8 +351,9 @@ class _SensorSidebarState extends ConsumerState<SensorSidebar> {
         return (min, max);
       }
 
-      for (int i = fieldIdx; i < pcbuf.buf.length; i += pcbuf.stride) {
-        final v = pcbuf.buf[i];
+      for (int i = 0; i < numPoints; i++) {
+        final base = i * pcbuf.stride;
+        final v = pcbuf.buf[base + fieldIdx];
         if (v < min) min = v;
         if (v > max) max = v;
       }

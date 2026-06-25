@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'websocket_provider.dart';
+part of 'loading_overlay_provider.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,51 +9,51 @@ part of 'websocket_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(WebSocketManager)
-final webSocketManagerProvider = WebSocketManagerProvider._();
+@ProviderFor(LoadingOverlay)
+final loadingOverlayProvider = LoadingOverlayProvider._();
 
-final class WebSocketManagerProvider
-    extends $NotifierProvider<WebSocketManager, WebSocketState> {
-  WebSocketManagerProvider._()
+final class LoadingOverlayProvider
+    extends $NotifierProvider<LoadingOverlay, bool> {
+  LoadingOverlayProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'webSocketManagerProvider',
+        name: r'loadingOverlayProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$webSocketManagerHash();
+  String debugGetCreateSourceHash() => _$loadingOverlayHash();
 
   @$internal
   @override
-  WebSocketManager create() => WebSocketManager();
+  LoadingOverlay create() => LoadingOverlay();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(WebSocketState value) {
+  Override overrideWithValue(bool value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<WebSocketState>(value),
+      providerOverride: $SyncValueProvider<bool>(value),
     );
   }
 }
 
-String _$webSocketManagerHash() => r'04ae8e6ba5f74d4d6ce021f653b530d1b81a5f9f';
+String _$loadingOverlayHash() => r'72cbdb93a5b17cb8d95c728588b9d30236cfeeab';
 
-abstract class _$WebSocketManager extends $Notifier<WebSocketState> {
-  WebSocketState build();
+abstract class _$LoadingOverlay extends $Notifier<bool> {
+  bool build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<WebSocketState, WebSocketState>;
+    final ref = this.ref as $Ref<bool, bool>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<WebSocketState, WebSocketState>,
-              WebSocketState,
+              AnyNotifier<bool, bool>,
+              bool,
               Object?,
               Object?
             >;

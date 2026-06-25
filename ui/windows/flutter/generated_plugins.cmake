@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  point_glass_opengl
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
