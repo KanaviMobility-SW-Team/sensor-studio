@@ -1,4 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'grid_provider.g.dart';
 
 class GridSettings {
   final double gridSize;
@@ -30,7 +32,8 @@ class GridSettings {
   );
 }
 
-class GridSettingsNotifier extends Notifier<GridSettings> {
+@riverpod
+class GridSettingsNotifier extends _$GridSettingsNotifier {
   @override
   GridSettings build() => const GridSettings();
 
@@ -42,8 +45,3 @@ class GridSettingsNotifier extends Notifier<GridSettings> {
   void updateShowGridLabels(bool value) =>
       state = state.copyWith(showGridLabels: value);
 }
-
-final gridSettingsProvider =
-    NotifierProvider<GridSettingsNotifier, GridSettings>(
-      GridSettingsNotifier.new,
-    );

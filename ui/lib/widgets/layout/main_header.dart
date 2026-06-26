@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ui/providers/loading_overlay_provider.dart';
 import 'package:ui/providers/websocket_provider.dart';
+import 'package:ui/providers/ui_layout_provider.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/widgets/dialogs/text_input_dialog.dart';
 
@@ -15,6 +16,7 @@ class MainHeader extends ConsumerWidget {
     // 상태 구독
     final wsState = ref.watch(webSocketManagerProvider);
     final wsNotifier = ref.read(webSocketManagerProvider.notifier);
+    final uiLayoutState = ref.watch(uILayoutProvider);
 
     ref.listen<ConnectionStatus>(
       webSocketManagerProvider.select((state) => state.status),
@@ -70,6 +72,69 @@ class MainHeader extends ConsumerWidget {
               fontSize: 18,
             ),
           ),
+          const SizedBox(width: 20),
+          Material(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(5),
+              mouseCursor: SystemMouseCursors.click,
+              hoverColor: Colors.white.withAlpha(50),
+              splashColor: Colors.white.withAlpha(50),
+              highlightColor: Colors.white.withAlpha(25),
+              child: Image.asset(
+                uiLayoutState.isLeftSidebarVisible
+                    ? 'assets/sidebar_left_on.png'
+                    : 'assets/sidebar_left_off.png',
+                height: 20,
+              ),
+              onTap: () {
+                ref
+                    .read(uILayoutProvider.notifier)
+                    .updateLeftSidebarVisibility(
+                      !uiLayoutState.isLeftSidebarVisible,
+                    );
+              },
+            ),
+          ),
+          // TODO: 우측 설정창 구현 후 주석 제거
+          // const SizedBox(width: 8),
+          // InkWell(
+          //   child: Image.asset(
+          //     uiLayoutState.isRightSidebarVisible
+          //         ? 'assets/sidebar_right_on.png'
+          //         : 'assets/sidebar_right_off.png',
+          //     height: 20,
+          //   ),
+          //   onTap: () {
+          //     ref
+          //         .read(uILayoutProvider.notifier)
+          //         .updateRightSidebarVisibility(
+          //           !uiLayoutState.isRightSidebarVisible,
+          //         );
+          //   },
+          // ),
+          const SizedBox(width: 8),
+          Material(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(5),
+              mouseCursor: SystemMouseCursors.click,
+              hoverColor: Colors.white.withAlpha(50),
+              splashColor: Colors.white.withAlpha(50),
+              highlightColor: Colors.white.withAlpha(25),
+              child: Image.asset(
+                uiLayoutState.isBottombarVisible
+                    ? 'assets/bottombar_on.png'
+                    : 'assets/bottombar_off.png',
+                height: 20,
+              ),
+              onTap: () {
+                ref
+                    .read(uILayoutProvider.notifier)
+                    .updateBottombarVisibility(
+                      !uiLayoutState.isBottombarVisible,
+                    );
+              },
+            ),
+          ),
           const Spacer(),
           Container(
             width: 14,
@@ -84,7 +149,7 @@ class MainHeader extends ConsumerWidget {
             statusText,
             style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
           wsState.status != ConnectionStatus.connected
               ? IconButton(
                   icon: const Icon(Icons.link, size: 24),
@@ -93,7 +158,7 @@ class MainHeader extends ConsumerWidget {
                     var value = await textInputShowDialog(
                       context: context,
                       title: 'Connect to WebSocket',
-                      hint: 'Enter WebSocket URL',
+                      hint: 'Enterr WebSocket URL',
                       init: 'ws://localhost:8080/ws',
                       submitText: 'Connect',
                       cancelText: 'Cancel',
