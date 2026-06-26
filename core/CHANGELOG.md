@@ -2,6 +2,21 @@
 
 All notable changes to the `sensor-studio-core` project will be documented in this file.
 
+## [v0.3.0] - 2026-06-26
+
+### Features
+
+* **Binary Point Cloud Streaming 지원**: `ChannelEncoder`에 Binary 모드를 추가하여 기존 JSON 기반 스트림과 함께 Binary 기반 포인트 클라우드 스트리밍을 지원하도록 확장.
+* **JSON/Binary Dual Channel 지원**: 채널 자동 생성 구조를 통해 동일한 포인트 클라우드 데이터를 JSON/Binary 두 가지 형식으로 구독 및 송신할 수 있도록 개선.
+
+### Improvements
+
+* **WebSocket Outbound 전송 구조 개선**: 클라이언트별 outbound queue 방식 대신 subscription별 최신 프레임만 유지하는 state 기반 전송 구조로 변경.
+* **실시간 스트리밍 안정성 개선**: 센서 데이터는 `Notify` 기반으로 최신 상태만 flush 하도록 정리하여 느린 클라이언트나 고주파 데이터 입력 상황에서도 최신 프레임 중심으로 동작하도록 개선.
+* **불필요한 Payload Encoding 최소화**: subscription 매칭 이후 실제 전송이 필요한 경우에만 JSON/Binary 인코딩을 수행하도록 변경하여 불필요한 인코딩 오버헤드 감소.
+
+---
+
 ## [v0.2.0] - 2026-05-14
 
 ### Features
