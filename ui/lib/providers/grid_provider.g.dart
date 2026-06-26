@@ -42,7 +42,7 @@ final class GridSettingsNotifierProvider
 }
 
 String _$gridSettingsNotifierHash() =>
-    r'a73b8d6bc2356e05800eec2ba5fb3070077485bc';
+    r'bc158252df409487a183bd3fd405b1c91b9779da';
 
 abstract class _$GridSettingsNotifier extends $Notifier<GridSettings> {
   GridSettings build();

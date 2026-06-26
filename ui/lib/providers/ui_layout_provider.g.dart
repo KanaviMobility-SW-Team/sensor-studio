@@ -41,7 +41,7 @@ final class UILayoutProvider
   }
 }
 
-String _$uILayoutHash() => r'1c6410dae78b2632c6c9011fa9d89ffb499ec1f4';
+String _$uILayoutHash() => r'773c49db5b720eda9d526e352cba7dd61f5b50c3';
 
 abstract class _$UILayout extends $Notifier<UILayoutState> {
   UILayoutState build();

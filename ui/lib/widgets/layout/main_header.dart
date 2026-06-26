@@ -159,7 +159,7 @@ class MainHeader extends ConsumerWidget {
                       context: context,
                       title: 'Connect to WebSocket',
                       hint: 'Enterr WebSocket URL',
-                      init: 'ws://localhost:8080/ws',
+                      init: wsNotifier.currentAddress,
                       submitText: 'Connect',
                       cancelText: 'Cancel',
                     );

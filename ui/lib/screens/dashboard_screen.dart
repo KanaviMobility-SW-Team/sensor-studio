@@ -24,18 +24,20 @@ class DashboardScreen extends ConsumerWidget {
             Expanded(
               child: Row(
                 children: [
-                  uiLayoutState.isLeftSidebarVisible
-                      ? const SensorSidebar()
-                      : SizedBox.shrink(),
+                  Offstage(
+                    offstage: !uiLayoutState.isLeftSidebarVisible,
+                    child: const SensorSidebar(),
+                  ),
                   Container(width: 1, color: Colors.black),
                   const MainVisualizer(),
                 ],
               ),
             ),
             Container(height: 1, color: Colors.black),
-            uiLayoutState.isBottombarVisible
-                ? const BottomConsole()
-                : SizedBox.shrink(),
+            Offstage(
+              offstage: !uiLayoutState.isBottombarVisible,
+              child: const BottomConsole(),
+            ),
           ],
         ),
       ),
