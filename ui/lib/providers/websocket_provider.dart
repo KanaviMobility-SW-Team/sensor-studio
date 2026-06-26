@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'package:ui/providers/settings_storage_provider.dart';
 import 'package:ui/providers/sensor_provider.dart';
 import 'package:ui/providers/pointcloud_provider.dart';
 
@@ -60,19 +61,92 @@ class WebSocketState {
   }
 }
 
+class WebSocketServerInfo {
+  final String ip;
+  final int port;
+  final String path;
+
+  WebSocketServerInfo({
+    required this.ip,
+    required this.port,
+    required this.path,
+  });
+
+  factory WebSocketServerInfo.fromJson(Map<String, dynamic> json) {
+    return WebSocketServerInfo(
+      ip: json['ip'] as String,
+      port: json['port'] as int,
+      path: json['path'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'ip': ip, 'port': port, 'path': path};
+  }
+
+  @override
+  String toString() {
+    return 'ws://$ip:$port/$path';
+  }
+
+  factory WebSocketServerInfo.toObject(String url) {
+    String str = url.replaceAll("ws://", "");
+    var parts = str.split('/');
+    var path = str.replaceAll("${parts[0]}/", "");
+
+    parts = parts[0].split(':');
+    var port = 8080;
+    if (parts.length > 1) {
+      port = int.parse(parts[1]);
+    }
+
+    var ip = parts[0];
+    return WebSocketServerInfo(ip: ip, port: port, path: path);
+  }
+}
+
 @riverpod
 class WebSocketManager extends _$WebSocketManager {
+  static const _fileName = 'websocket_manager.json';
+
   WebSocketChannel? _channel;
   final _log = Logger('WebSocketManager');
   int _nextSubscriptionId = 1;
 
+  String _address = 'ws://localhost:8080/ws';
+
+  String get currentAddress => _address;
+
   @override
   WebSocketState build() {
+    Future.microtask(_load);
     return WebSocketState(status: ConnectionStatus.disconnected);
+  }
+
+  Future<void> _load() async {
+    final storage = ref.read(settingsFileStorageProvider);
+    final json = await storage.readJson(_fileName);
+
+    if (json == null) {
+      return;
+    }
+
+    _address = WebSocketServerInfo.fromJson(json).toString();
+  }
+
+  Future<void> _save(String url) async {
+    _address = url;
+
+    final storage = ref.read(settingsFileStorageProvider);
+    await storage.writeJson(
+      _fileName,
+      WebSocketServerInfo.toObject(url).toJson(),
+    );
   }
 
   // WebSocket 서버에 연결하는 함수
   Future<void> connect(String url) async {
+    await _save(url);
     if (state.status == ConnectionStatus.connected) return;
 
     state = state.copyWith(status: ConnectionStatus.connecting);

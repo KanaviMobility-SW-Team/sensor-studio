@@ -20,7 +20,7 @@ class SensorStudioApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sensor-Studio',
-      theme: ThemeData.dark(), // 기본적으로 어두운 테마 사용
+      theme: ThemeData.dark(),
       home: const DashboardScreen(),
     );
   }

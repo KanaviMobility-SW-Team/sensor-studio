@@ -43,23 +43,22 @@ class _StepperControlState extends State<StepperControl> {
             ),
           ),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(5.0),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(20),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _isLeftButtonHovered
-                          ? AppColors.accent.withAlpha(100)
-                          : Colors.transparent,
+            child: Material(
+              child: Container(
+                padding: const EdgeInsets.all(5.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    InkWell(
                       borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: InkWell(
+                      mouseCursor: SystemMouseCursors.click,
+                      hoverColor: AppColors.accent.withAlpha(100),
+                      splashColor: AppColors.accent.withAlpha(100),
+                      highlightColor: AppColors.accent.withAlpha(50),
                       onHover: (hovering) {
                         setState(() {
                           _isLeftButtonHovered = hovering;
@@ -84,23 +83,23 @@ class _StepperControlState extends State<StepperControl> {
                             )
                           : const SizedBox(width: 20, height: 20),
                     ),
-                  ),
-                  SizedBox(
-                    width: 56,
-                    child: Text(
-                      '${widget.value}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    SizedBox(
+                      width: 56,
+                      child: Text(
+                        '${widget.value}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _isRightButtonHovered
-                          ? AppColors.accent.withAlpha(100)
-                          : Colors.transparent,
+                    InkWell(
                       borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: InkWell(
+                      mouseCursor: SystemMouseCursors.click,
+                      hoverColor: AppColors.accent.withAlpha(100),
+                      splashColor: AppColors.accent.withAlpha(100),
+                      highlightColor: AppColors.accent.withAlpha(50),
                       onHover: (hovering) {
                         setState(() {
                           _isRightButtonHovered = hovering;
@@ -125,8 +124,8 @@ class _StepperControlState extends State<StepperControl> {
                             )
                           : const SizedBox(width: 20, height: 20),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -179,23 +178,22 @@ class _DoubleStepperControlState extends State<DoubleStepperControl> {
             ),
           ),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(5.0),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(20),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _isLeftButtonHovered
-                          ? AppColors.accent.withAlpha(100)
-                          : Colors.transparent,
+            child: Material(
+              child: Container(
+                padding: const EdgeInsets.all(5.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    InkWell(
                       borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: InkWell(
+                      mouseCursor: SystemMouseCursors.click,
+                      hoverColor: AppColors.accent.withAlpha(100),
+                      splashColor: AppColors.accent.withAlpha(100),
+                      highlightColor: AppColors.accent.withAlpha(50),
                       onHover: (hovering) {
                         setState(() {
                           _isLeftButtonHovered = hovering;
@@ -219,23 +217,23 @@ class _DoubleStepperControlState extends State<DoubleStepperControl> {
                             )
                           : const SizedBox(width: 20, height: 20),
                     ),
-                  ),
-                  SizedBox(
-                    width: 56,
-                    child: Text(
-                      widget.value.toStringAsFixed(widget.step < 1.0 ? 1 : 0),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    SizedBox(
+                      width: 56,
+                      child: Text(
+                        widget.value.toStringAsFixed(widget.step < 1.0 ? 1 : 0),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _isRightButtonHovered
-                          ? AppColors.accent.withAlpha(100)
-                          : Colors.transparent,
+                    InkWell(
                       borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: InkWell(
+                      mouseCursor: SystemMouseCursors.click,
+                      hoverColor: AppColors.accent.withAlpha(100),
+                      splashColor: AppColors.accent.withAlpha(100),
+                      highlightColor: AppColors.accent.withAlpha(50),
                       onHover: (hovering) {
                         setState(() {
                           _isRightButtonHovered = hovering;
@@ -259,8 +257,8 @@ class _DoubleStepperControlState extends State<DoubleStepperControl> {
                             )
                           : const SizedBox(width: 20, height: 20),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

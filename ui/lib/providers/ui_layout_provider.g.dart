@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'websocket_provider.dart';
+part of 'ui_layout_provider.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,51 +9,51 @@ part of 'websocket_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(WebSocketManager)
-final webSocketManagerProvider = WebSocketManagerProvider._();
+@ProviderFor(UILayout)
+final uILayoutProvider = UILayoutProvider._();
 
-final class WebSocketManagerProvider
-    extends $NotifierProvider<WebSocketManager, WebSocketState> {
-  WebSocketManagerProvider._()
+final class UILayoutProvider
+    extends $NotifierProvider<UILayout, UILayoutState> {
+  UILayoutProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'webSocketManagerProvider',
+        name: r'uILayoutProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$webSocketManagerHash();
+  String debugGetCreateSourceHash() => _$uILayoutHash();
 
   @$internal
   @override
-  WebSocketManager create() => WebSocketManager();
+  UILayout create() => UILayout();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(WebSocketState value) {
+  Override overrideWithValue(UILayoutState value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<WebSocketState>(value),
+      providerOverride: $SyncValueProvider<UILayoutState>(value),
     );
   }
 }
 
-String _$webSocketManagerHash() => r'b4cad9360b67ad1324ec3c0e138fc1b78c89acd1';
+String _$uILayoutHash() => r'773c49db5b720eda9d526e352cba7dd61f5b50c3';
 
-abstract class _$WebSocketManager extends $Notifier<WebSocketState> {
-  WebSocketState build();
+abstract class _$UILayout extends $Notifier<UILayoutState> {
+  UILayoutState build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<WebSocketState, WebSocketState>;
+    final ref = this.ref as $Ref<UILayoutState, UILayoutState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<WebSocketState, WebSocketState>,
-              WebSocketState,
+              AnyNotifier<UILayoutState, UILayoutState>,
+              UILayoutState,
               Object?,
               Object?
             >;

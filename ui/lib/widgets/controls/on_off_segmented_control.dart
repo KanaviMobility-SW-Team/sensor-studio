@@ -19,9 +19,6 @@ class OnOffSegmentedControl extends StatefulWidget {
 }
 
 class _OnOffSegmentedControlState extends State<OnOffSegmentedControl> {
-  bool _isOnButtonHovered = false;
-  bool _isOffButtonHovered = false;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -41,21 +38,19 @@ class _OnOffSegmentedControlState extends State<OnOffSegmentedControl> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _isOnButtonHovered
-                          ? AppColors.accent.withAlpha(100)
-                          : widget.value
-                          ? AppColors.accent.withAlpha(100)
-                          : Colors.transparent,
+                  child: Material(
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                     ),
+                    color: widget.value
+                        ? AppColors.accent.withAlpha(100)
+                        : Colors.transparent,
                     child: InkWell(
-                      onHover: (hovering) {
-                        setState(() {
-                          _isOnButtonHovered = hovering;
-                        });
-                      },
+                      borderRadius: BorderRadius.circular(5),
+                      mouseCursor: SystemMouseCursors.click,
+                      hoverColor: AppColors.accent.withAlpha(100),
+                      splashColor: AppColors.accent.withAlpha(100),
+                      highlightColor: AppColors.accent.withAlpha(50),
                       onTap: () {
                         widget.onChanged(true);
                       },
@@ -78,21 +73,19 @@ class _OnOffSegmentedControlState extends State<OnOffSegmentedControl> {
                 ),
                 const SizedBox(width: 3),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _isOffButtonHovered
-                          ? AppColors.accent.withAlpha(100)
-                          : !widget.value
-                          ? AppColors.accent.withAlpha(100)
-                          : Colors.transparent,
+                  child: Material(
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                     ),
+                    color: !widget.value
+                        ? AppColors.accent.withAlpha(100)
+                        : Colors.transparent,
                     child: InkWell(
-                      onHover: (hovering) {
-                        setState(() {
-                          _isOffButtonHovered = hovering;
-                        });
-                      },
+                      borderRadius: BorderRadius.circular(5),
+                      mouseCursor: SystemMouseCursors.click,
+                      hoverColor: AppColors.accent.withAlpha(100),
+                      splashColor: AppColors.accent.withAlpha(100),
+                      highlightColor: AppColors.accent.withAlpha(50),
                       onTap: () {
                         widget.onChanged(false);
                       },
