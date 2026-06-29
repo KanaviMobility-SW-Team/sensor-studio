@@ -26,3 +26,6 @@ core/config/*
 
 # Except the example config file
 !core/config/runtime.toml.example
+
+# Ignore everything in ui/dist/
+ui/dist/*
