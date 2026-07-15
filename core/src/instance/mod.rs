@@ -7,7 +7,7 @@
 use std::io;
 
 use crate::engine::Engine;
-use crate::transport::{Transport, TransportRequest, TransportResponseMode};
+use crate::transport::Transport;
 use crate::types::PointCloudFrame;
 
 /// 인스턴스 고유 식별자
@@ -104,19 +104,20 @@ impl Instance {
 
     /// transport shutdown 패킷 전송 (엔진이 shutdown_payload를 제공하는 경우)
     pub async fn shutdown(&mut self) {
-        if let Some(payload) = self.engine.shutdown_payload() {
-            let request = TransportRequest {
-                data: payload,
-                response_mode: TransportResponseMode::None,
-            };
+        loop {
+            if let Some(shutdown_request) = self.engine.pop_shutdown_request() {
+                tracing::info!("Instance '{}' sending shutdown payload", self.id);
 
-            tracing::info!("Instance '{}' sending shutdown payload", self.id);
+                if let Err(error) = self.transport.transact_chunk(shutdown_request).await {
+                    tracing::warn!(
+                        "Instance '{}' failed to send shutdown payload: {error}",
+                        self.id
+                    );
 
-            if let Err(error) = self.transport.transact_chunk(request).await {
-                tracing::warn!(
-                    "Instance '{}' failed to send shutdown payload: {error}",
-                    self.id
-                );
+                    break;
+                }
+            } else {
+                break;
             }
         }
     }

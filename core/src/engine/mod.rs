@@ -36,9 +36,9 @@ pub trait Engine: Send {
         Ok(None)
     }
 
-    /// 종료 시 transport로 전송할 엔진 고유 페이로드 반환
-    /// `engine_get_shutdown_payload` FFI 심볼을 제공하는 경우 유효
-    fn shutdown_payload(&self) -> Option<Bytes> {
+    /// 종료 시 transport로 전송할 엔진 고유 request payload를 반환
+    /// `engine_get_shutdown_request` FFI 심볼을 제공하는 경우 유효
+    fn pop_shutdown_request(&self) -> Option<TransportRequest> {
         None
     }
 }

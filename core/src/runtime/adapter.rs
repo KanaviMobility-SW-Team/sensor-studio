@@ -7,10 +7,10 @@ use bytes::Bytes;
 use crate::engine::{Engine, EngineProcessResult};
 use crate::runtime::ffi::{
     EngineHandle, FFI_STATUS_OK, FfiApiBuffer, FfiApiInfo, FfiPointCloudFrame, FfiTransportRequest,
-    FfiTransportResponseMode,
+    FfiTransportResponseMode, FfiTransportWriteMode,
 };
 use crate::runtime::loader::EngineLibrary;
-use crate::transport::{TransportRequest, TransportResponseMode};
+use crate::transport::{TransportRequest, TransportResponseMode, TransportWriteMode};
 use crate::types::pointcloud::{PointCloudFrame, PointField, PointFieldDataType};
 
 /// 엔진이 제공하는 동적 제어/설정 API(Extension API) 메타데이터
@@ -286,6 +286,7 @@ impl FfiEngineAdapter {
             data_len: 0,
             response_mode: FfiTransportResponseMode::None,
             response_count: 0,
+            write_mode: FfiTransportWriteMode::Bulk,
         };
 
         let status = unsafe { pop_fn(self.handle, &mut ffi_request) };
@@ -301,6 +302,11 @@ impl FfiEngineAdapter {
                 TransportResponseMode::Count(ffi_request.response_count)
             }
             FfiTransportResponseMode::UntilTimeout => TransportResponseMode::UntilTimeout,
+        };
+
+        let write_mode = match ffi_request.write_mode {
+            FfiTransportWriteMode::Bulk => TransportWriteMode::Bulk,
+            FfiTransportWriteMode::Control => TransportWriteMode::Control,
         };
 
         let data = if ffi_request.data_ptr.is_null() || ffi_request.data_len == 0 {
@@ -321,6 +327,7 @@ impl FfiEngineAdapter {
         Ok(Some(TransportRequest {
             data,
             response_mode,
+            write_mode,
         }))
     }
 }
@@ -346,30 +353,62 @@ impl Engine for FfiEngineAdapter {
         ))
     }
 
-    fn shutdown_payload(&self) -> Option<Bytes> {
-        let get_fn = self.library.get_shutdown_payload?;
+    fn pop_shutdown_request(&self) -> Option<TransportRequest> {
+        let get_fn = self.library.pop_shutdown_request?;
 
-        let mut buffer = std::mem::MaybeUninit::<FfiApiBuffer>::uninit();
-        let status = unsafe { get_fn(self.handle, buffer.as_mut_ptr()) };
+        let mut shutdown_reqeust = std::mem::MaybeUninit::<FfiTransportRequest>::uninit();
+        let status = unsafe { get_fn(self.handle, shutdown_reqeust.as_mut_ptr()) };
 
         if status != FFI_STATUS_OK {
             return None;
         }
 
-        let mut buffer = unsafe { buffer.assume_init() };
+        let mut ffi_shutdown_request = unsafe { shutdown_reqeust.assume_init() };
 
-        if buffer.data_ptr.is_null() || buffer.data_len == 0 {
-            unsafe { (self.library.free_api_buffer)(&mut buffer) };
+        if ffi_shutdown_request.data_ptr.is_null() || ffi_shutdown_request.data_len == 0 {
+            if let Some(free_request) = self.library.free_transport_request {
+                unsafe {
+                    free_request(&mut ffi_shutdown_request);
+                }
+            }
             return None;
         }
 
+        let free_request = self
+            .library
+            .free_transport_request
+            .expect("engine_free_transport_request is required when transport request is returned");
+
         let data = unsafe {
-            Bytes::copy_from_slice(std::slice::from_raw_parts(buffer.data_ptr, buffer.data_len))
+            Bytes::copy_from_slice(std::slice::from_raw_parts(
+                ffi_shutdown_request.data_ptr,
+                ffi_shutdown_request.data_len,
+            ))
         };
 
-        unsafe { (self.library.free_api_buffer)(&mut buffer) };
+        let response_mode = match ffi_shutdown_request.response_mode {
+            FfiTransportResponseMode::None => TransportResponseMode::None,
+            FfiTransportResponseMode::One => TransportResponseMode::One,
+            FfiTransportResponseMode::Count => {
+                TransportResponseMode::Count(ffi_shutdown_request.response_count)
+            }
+            FfiTransportResponseMode::UntilTimeout => TransportResponseMode::UntilTimeout,
+        };
 
-        Some(data)
+        let write_mode = match ffi_shutdown_request.write_mode {
+            FfiTransportWriteMode::Bulk => TransportWriteMode::Bulk,
+            FfiTransportWriteMode::Control => TransportWriteMode::Control,
+        };
+
+        unsafe {
+            free_request(&mut ffi_shutdown_request);
+        }
+
+        Some(TransportRequest {
+            data,
+            response_mode,
+            write_mode,
+        })
     }
 }
 
@@ -418,9 +457,9 @@ impl Engine for SharedFfiEngineAdapter {
         })
     }
 
-    fn shutdown_payload(&self) -> Option<Bytes> {
+    fn pop_shutdown_request(&self) -> Option<TransportRequest> {
         tokio::task::block_in_place(|| match self.inner.lock() {
-            Ok(adapter) => adapter.shutdown_payload(),
+            Ok(adapter) => adapter.pop_shutdown_request(),
             Err(error) => {
                 tracing::error!("failed to lock ffi engine adapter for shutdown_payload: {error}");
                 None
