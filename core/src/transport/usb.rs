@@ -13,7 +13,7 @@ use rusb::{DeviceHandle, GlobalContext};
 use crate::config::UsbTransportRuntimeConfig;
 use crate::transport::{
     Transport, TransportChunk, TransportFuture, TransportId, TransportKind, TransportRequest,
-    TransportResponseMode,
+    TransportResponseMode, TransportWriteMode,
 };
 
 /// USB 장치를 기존 Engine FFI의 sender_addr 구조에 맞추기 위한 synthetic address
@@ -106,6 +106,55 @@ impl UsbTransport {
             self.config.vendor_id, self.config.product_id, self.config.interface
         )
     }
+
+    fn write_control_setup(&mut self, data: &[u8]) -> io::Result<usize> {
+        if data.len() < 8 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "control setup must be at least 8 bytes",
+            ));
+        }
+
+        let bm = data[0];
+        let req = data[1];
+        let value = u16::from_le_bytes([data[2], data[3]]);
+        let index = u16::from_le_bytes([data[4], data[5]]);
+        let length = u16::from_le_bytes([data[6], data[7]]) as usize;
+        let payload = &data[8..];
+
+        if payload.len() != length {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "control payload length mismatch: wLength={}, payload={}",
+                    length,
+                    payload.len()
+                ),
+            ));
+        }
+
+        let written = self
+            .handle
+            .write_control(bm, req, value, index, payload, self.transact_timeout)
+            .map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("USB control write failed: {error}"),
+                )
+            })?;
+
+        if written != length {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                format!(
+                    "USB control write incomplete: written={}, expected={}",
+                    written, length
+                ),
+            ));
+        }
+
+        Ok(written)
+    }
 }
 
 impl Transport for UsbTransport {
@@ -157,29 +206,37 @@ impl Transport for UsbTransport {
     ) -> TransportFuture<'_, Vec<TransportChunk>> {
         Box::pin(async move {
             tokio::task::block_in_place(|| {
-                let written = self
-                    .handle
-                    .write_bulk(
-                        self.config.endpoint_out,
-                        &request.data,
-                        self.transact_timeout,
-                    )
-                    .map_err(|error| {
-                        io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("USB bulk write failed: {error}"),
-                        )
-                    })?;
+                match request.write_mode {
+                    TransportWriteMode::Bulk => {
+                        let written = self
+                            .handle
+                            .write_bulk(
+                                self.config.endpoint_out,
+                                &request.data,
+                                self.transact_timeout,
+                            )
+                            .map_err(|error| {
+                                io::Error::new(
+                                    io::ErrorKind::Other,
+                                    format!("USB bulk write failed: {error}"),
+                                )
+                            })?;
 
-                if written != request.data.len() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::WriteZero,
-                        format!(
-                            "USB bulk write incomplete: written={}, expected={}",
-                            written,
-                            request.data.len()
-                        ),
-                    ));
+                        if written != request.data.len() {
+                            return Err(io::Error::new(
+                                io::ErrorKind::WriteZero,
+                                format!(
+                                    "USB bulk write incomplete: written={}, expected={}",
+                                    written,
+                                    request.data.len()
+                                ),
+                            ));
+                        }
+                    }
+
+                    TransportWriteMode::Control => {
+                        self.write_control_setup(&request.data)?;
+                    }
                 }
 
                 let expected_response_count = match request.response_mode {

@@ -47,10 +47,17 @@ impl Default for TransportResponseMode {
 }
 
 /// 트랜스포트로 전송할 원시 데이터 청크
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransportWriteMode {
+    Bulk,
+    Control,
+}
+
 #[derive(Debug, Clone)]
 pub struct TransportRequest {
     pub data: Bytes,
     pub response_mode: TransportResponseMode,
+    pub write_mode: TransportWriteMode,
 }
 
 pub trait Transport {

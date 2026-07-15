@@ -116,11 +116,19 @@ pub enum FfiTransportResponseMode {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub enum FfiTransportWriteMode {
+    Bulk = 0,
+    Control = 1,
+}
+
+#[repr(C)]
 pub struct FfiTransportRequest {
     pub data_ptr: *mut u8,
     pub data_len: usize,
     pub response_mode: FfiTransportResponseMode,
     pub response_count: usize,
+    pub write_mode: FfiTransportWriteMode,
 }
 
 pub type EngineHasTransportRequestFn = unsafe extern "C" fn(handle: EngineHandle) -> bool;
@@ -130,7 +138,7 @@ pub type EnginePopTransportRequestFn =
 
 pub type EngineFreeTransportRequestFn = unsafe extern "C" fn(request: *mut FfiTransportRequest);
 
-/// 종료 시 transport로 전송할 페이로드 조회
-/// 반환값 0: 유효 페이로드, 그 외: 전송 불필요
-pub type EngineGetShutdownPayloadFn =
-    unsafe extern "C" fn(handle: EngineHandle, out_buffer: *mut FfiApiBuffer) -> i32;
+/// 종료 시 transport로 전송할 request 조회
+/// 반환값 0: 유효 request, 그 외: 전송 불필요
+pub type EnginePopShutdownRequestFn =
+    unsafe extern "C" fn(handle: EngineHandle, out_buffer: *mut FfiTransportRequest) -> i32;
