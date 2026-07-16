@@ -7,6 +7,7 @@ import 'package:point_glass_opengl/point_glass_opengl.dart';
 import 'package:ui/providers/grid_provider.dart';
 import 'package:ui/providers/pointcloud_provider.dart';
 import 'package:ui/providers/sensor_provider.dart';
+import 'package:ui/providers/ui_layout_provider.dart';
 import 'package:ui/models/sensor_payload.dart';
 import 'package:ui/utils/point_cloud_parser.dart';
 
@@ -118,6 +119,7 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
   @override
   Widget build(BuildContext context) {
     final gridSettings = ref.watch(gridSettingsProvider);
+    final uiLayoutState = ref.watch(uILayoutProvider);
 
     // 데이터 또는 센서 설정이 바뀌면 백그라운드에서 색상 재계산
     ref.listen(pointCloudDataProvider, (_, _) => _scheduleRender());
@@ -144,6 +146,7 @@ class _MainVisualizerState extends ConsumerState<MainVisualizer> {
                   : false,
             ),
             controller: _glController,
+            enableMouseCoordinate: uiLayoutState.isMouseCoordinateEnabled,
           ),
         ),
       ),

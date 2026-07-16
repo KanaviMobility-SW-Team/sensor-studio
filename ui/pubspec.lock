@@ -596,10 +596,10 @@ packages:
     dependency: "direct main"
     description:
       name: point_glass_opengl
-      sha256: d863eaaed676b30f829946b071dbd62d4aee4c2c0df7782ddc6193031de64b88
+      sha256: "6cb5945ae24414a9a2271d35c4a9278f3effd4be221849b5da3899bfa3f1bfa7"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0"
+    version: "0.2.0"
   pool:
     dependency: transitive
     description:
