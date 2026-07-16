@@ -135,6 +135,28 @@ class MainHeader extends ConsumerWidget {
               },
             ),
           ),
+          const SizedBox(width: 4),
+          InkWell(
+            borderRadius: BorderRadius.circular(5),
+            mouseCursor: SystemMouseCursors.click,
+            hoverColor: Colors.white.withAlpha(50),
+            splashColor: Colors.white.withAlpha(50),
+            highlightColor: Colors.white.withAlpha(25),
+            child: Icon(
+              Icons.mouse,
+              size: 25,
+              color: uiLayoutState.isMouseCoordinateEnabled
+                  ? AppColors.accent.withAlpha(150)
+                  : Colors.white.withAlpha(100),
+            ),
+            onTap: () {
+              ref
+                  .read(uILayoutProvider.notifier)
+                  .updateMouseCoordinateVisibility(
+                    !uiLayoutState.isMouseCoordinateEnabled,
+                  );
+            },
+          ),
           const Spacer(),
           Container(
             width: 14,

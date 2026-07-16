@@ -8,11 +8,13 @@ class UILayoutState {
   final bool isLeftSidebarVisible;
   final bool isRightSidebarVisible;
   final bool isBottombarVisible;
+  final bool isMouseCoordinateEnabled;
 
   UILayoutState({
     required this.isLeftSidebarVisible,
     required this.isRightSidebarVisible,
     required this.isBottombarVisible,
+    required this.isMouseCoordinateEnabled,
   });
 
   factory UILayoutState.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,8 @@ class UILayoutState {
       isLeftSidebarVisible: json['isLeftSidebarVisible'] as bool? ?? true,
       isRightSidebarVisible: json['isRightSidebarVisible'] as bool? ?? false,
       isBottombarVisible: json['isBottombarVisible'] as bool? ?? true,
+      isMouseCoordinateEnabled:
+          json['isMouseCoordinateEnabled'] as bool? ?? false,
     );
   }
 
@@ -28,6 +32,7 @@ class UILayoutState {
       'isLeftSidebarVisible': isLeftSidebarVisible,
       'isRightSidebarVisible': isRightSidebarVisible,
       'isBottombarVisible': isBottombarVisible,
+      'isMouseCoordinateEnabled': isMouseCoordinateEnabled,
     };
   }
 }
@@ -43,6 +48,7 @@ class UILayout extends _$UILayout {
       isLeftSidebarVisible: true,
       isRightSidebarVisible: false,
       isBottombarVisible: true,
+      isMouseCoordinateEnabled: false,
     );
   }
 
@@ -67,6 +73,7 @@ class UILayout extends _$UILayout {
       isLeftSidebarVisible: isVisible,
       isRightSidebarVisible: state.isRightSidebarVisible,
       isBottombarVisible: state.isBottombarVisible,
+      isMouseCoordinateEnabled: state.isMouseCoordinateEnabled,
     );
     _save();
   }
@@ -76,6 +83,7 @@ class UILayout extends _$UILayout {
       isLeftSidebarVisible: state.isLeftSidebarVisible,
       isRightSidebarVisible: isVisible,
       isBottombarVisible: state.isBottombarVisible,
+      isMouseCoordinateEnabled: state.isMouseCoordinateEnabled,
     );
     _save();
   }
@@ -85,6 +93,17 @@ class UILayout extends _$UILayout {
       isLeftSidebarVisible: state.isLeftSidebarVisible,
       isRightSidebarVisible: state.isRightSidebarVisible,
       isBottombarVisible: isVisible,
+      isMouseCoordinateEnabled: state.isMouseCoordinateEnabled,
+    );
+    _save();
+  }
+
+  void updateMouseCoordinateVisibility(bool isVisible) {
+    state = UILayoutState(
+      isLeftSidebarVisible: state.isLeftSidebarVisible,
+      isRightSidebarVisible: state.isRightSidebarVisible,
+      isBottombarVisible: state.isBottombarVisible,
+      isMouseCoordinateEnabled: isVisible,
     );
     _save();
   }
