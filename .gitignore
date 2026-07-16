@@ -29,3 +29,6 @@ core/config/*
 
 # Ignore everything in ui/dist/
 ui/dist/*
+
+# Dist
+dist/*

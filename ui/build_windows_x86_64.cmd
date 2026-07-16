@@ -55,7 +55,6 @@ set "PACKAGE_NAME=!APP_NAME:_=-!"
 
 set "ARTIFACT_NAME=!PACKAGE_NAME!-v!VERSION!-!TARGET_OS!-!TARGET_ARCH!"
 set "OUTPUT_DIR=!DIST_DIR!\!ARTIFACT_NAME!"
-set "ARCHIVE_PATH=!DIST_DIR!\!ARTIFACT_NAME!.zip"
 
 echo [INFO] app name      : !APP_NAME!
 echo [INFO] version       : !VERSION_RAW!
@@ -78,10 +77,6 @@ if not exist "!DIST_DIR!" (
 
 if exist "!OUTPUT_DIR!" (
     rmdir /s /q "!OUTPUT_DIR!"
-)
-
-if exist "!ARCHIVE_PATH!" (
-    del /q "!ARCHIVE_PATH!"
 )
 
 mkdir "!OUTPUT_DIR!"
@@ -107,18 +102,7 @@ if errorlevel 1 (
     exit /b 0
 )
 
-tar -a -c -f "!ARCHIVE_PATH!" -C "!DIST_DIR!" "!ARTIFACT_NAME!"
-if errorlevel 1 (
-    echo [WARN] failed to create zip archive.
-    echo [INFO] release bundle created:
-    echo        !OUTPUT_DIR!
-    exit /b 0
-)
-
 echo [INFO] release bundle created:
 echo        !OUTPUT_DIR!
-echo.
-echo [INFO] release archive created:
-echo        !ARCHIVE_PATH!
 
 endlocal
