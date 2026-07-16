@@ -49,7 +49,6 @@ PACKAGE_NAME="${APP_NAME//_/-}"
 ARTIFACT_NAME="${PACKAGE_NAME}-v${VERSION}-${TARGET_OS}-${TARGET_ARCH}"
 BUNDLE_DIR="build/linux/${FLUTTER_ARCH_DIR}/release/bundle"
 OUTPUT_DIR="${DIST_DIR}/${ARTIFACT_NAME}"
-ARCHIVE_PATH="${DIST_DIR}/${ARTIFACT_NAME}.tar.gz"
 
 echo "[INFO] app name      : $APP_NAME"
 echo "[INFO] version       : $VERSION_RAW"
@@ -64,7 +63,6 @@ if [[ ! -d "$BUNDLE_DIR" ]]; then
 fi
 
 rm -rf "$OUTPUT_DIR"
-rm -f "$ARCHIVE_PATH"
 
 mkdir -p "$DIST_DIR"
 cp -a "$BUNDLE_DIR" "$OUTPUT_DIR"
@@ -77,10 +75,5 @@ Build Host: $(uname -s)-$(uname -m)
 Built At UTC: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF
 
-tar -C "$DIST_DIR" -czf "$ARCHIVE_PATH" "$ARTIFACT_NAME"
-
 echo "[INFO] release bundle created:"
 echo "       ${OUTPUT_DIR}"
-echo
-echo "[INFO] release archive created:"
-echo "       ${ARCHIVE_PATH}"
