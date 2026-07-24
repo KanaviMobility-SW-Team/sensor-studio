@@ -3,3 +3,6 @@ linker = "gcc"
 
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
+
+[alias]
+android = "ndk --platform 21 -t arm64-v8a build --release --lib"

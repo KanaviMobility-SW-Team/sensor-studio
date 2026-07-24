@@ -1,0 +1,62 @@
+[server]
+ws_bind_addr = "0.0.0.0:8080"
+broadcast_capacity = 32
+
+[[instances]]
+instance_id = "instance-1"
+
+[instances.engine]
+id = "km-1000t-multi-lidar-engine"
+library_path = "__NATIVE_LIBRARY_DIR__/libkm_1000t_multi_lidar_engine-v0.1.0-android-arm64-v8a.so"
+
+[instances.transport]
+type = "udp"
+bind_addr = "0.0.0.0:5000"
+buffer_size = 4096
+multicast_addr = "224.0.0.5"
+join_all_interfaces = true
+interface_addrs = []
+
+[[instances.engine.sensors]]
+ip = "192.168.10.201"
+x = -0.25
+y = 0.20
+z = 0.0
+roll = 0.0
+pitch = 0.0
+yaw = 45.0
+
+[[instances.engine.sensors]]
+ip = "192.168.10.202"
+x = 0.25
+y = 0.20
+z = 0.0
+roll = 0.0
+pitch = 0.0
+yaw = -45.0
+
+[[instances.engine.sensors]]
+ip = "192.168.10.203"
+x = 0.25
+y = -0.20
+z = 0.0
+roll = 0.0
+pitch = 0.0
+yaw = -135.0
+
+[[instances.engine.sensors]]
+ip = "192.168.10.204"
+x = -0.25
+y = -0.20
+z = 0.0
+roll = 0.0
+pitch = 0.0
+yaw = -225.0
+
+[instances.channel]
+channel_id = 1
+source_id = "sample_sensor"
+frame_id = "map"
+topic = "/pointcloud/sample_sensor"
+schema = "point_cloud"
+encoder = "json"

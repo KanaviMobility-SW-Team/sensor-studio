@@ -595,10 +595,9 @@ packages:
   point_glass_opengl:
     dependency: "direct main"
     description:
-      name: point_glass_opengl
-      sha256: "6cb5945ae24414a9a2271d35c4a9278f3effd4be221849b5da3899bfa3f1bfa7"
-      url: "https://pub.dev"
-    source: hosted
+      path: "../../../immsong/point_glass_opengl"
+      relative: true
+    source: path
     version: "0.2.0"
   pool:
     dependency: transitive
